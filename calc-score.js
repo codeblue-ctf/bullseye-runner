@@ -18,6 +18,18 @@ const pullImage = (teamName, problemName) => {
   spawnSync('docker', ['pull', image])
 }
 
+const setFlag = (teamName, problemName, flag) => {
+  // TODO: implement
+}
+
+const runExploit = (teamName, problemName) => {
+  // TODO: implement
+}
+
+const getSubmittedFlags = (teamName, problemName) => {
+  // TODO: implement
+}
+
 const runExploits = (teamName, problemName, calcTime, runTime, flags) => {
   loginToRegistry()
   // TODO: set tag
@@ -25,15 +37,15 @@ const runExploits = (teamName, problemName, calcTime, runTime, flags) => {
 
   for (let i = 0; i < calcTime; ++i) {
     const flag = flags[i]
-    setFlag(flag)
-    runExploit()
+    setFlag(teamName, problemName, flag)
+    runExploit(teamName, problemName)
   }
 }
 
 const calcScore = (teamName, problemName, calcTime, runTime) => {
   const flags = generateFlags(calcTime)
   runExploits(teamName, problemName, calcTime, runTime)
-  const submittedFlags = getSubmittedFlags()
+  const submittedFlags = getSubmittedFlags(teamName, problemName)
 
   const correctFlags = flags.filter(flag => submittedFlags.includes(flag))
   return correctFlags.length
