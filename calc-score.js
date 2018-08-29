@@ -1,8 +1,10 @@
 const { spawnSync } = require('child_proces')
+const fs = require('fs')
+const path = require('path')
 const config = require('../config.js')
 const { generateFlags } = require('./lib/flagGenerator.js')
 
-const loginToRegistry = () => {
+const loginRegistry = () => {
   spawnSync('docker', [
     'login',
     config.registry.server,
@@ -13,39 +15,44 @@ const loginToRegistry = () => {
   ])
 }
 
-const pullImage = (teamName, problemName) => {
-  const image = `${teamName}/${problemName}`
+const pullImage = (team, problem) => {
+  const image = `${team.name}/${problem.name}`
   spawnSync('docker', ['pull', image])
+  spawnSync('docker', ['tag', image, problem.exploit_container_name])
 }
 
-const setFlag = (teamName, problemName, flag) => {
+const setFlag = (workingDir, flag) => {
+  // XXX: flag filename is hardcoded
+  const flagFile = path.join(workingDir, 'flag')
+  fs.writeFileSync(flagFile, flag)
+}
+
+const runExploit = (workingDir, problem) => {
+  spawnSync('docker-compose', ['up'], { cwd: workingDir })
+  // TODO: sleep problem.run_time
+}
+
+const getSubmittedFlags = (team, problem) => {
   // TODO: implement
 }
 
-const runExploit = (teamName, problemName) => {
-  // TODO: implement
-}
+const runExploits = (team, problem, flags) => {
+  const workingDir = fs.mkdtempSync()
 
-const getSubmittedFlags = (teamName, problemName) => {
-  // TODO: implement
-}
+  loginRegistry()
+  pullImage(team, problem)
 
-const runExploits = (teamName, problemName, calcTime, runTime, flags) => {
-  loginToRegistry()
-  // TODO: set tag
-  pullImage(teamName, problemName)
-
-  for (let i = 0; i < calcTime; ++i) {
+  for (let i = 0; i < problem.calc_time; ++i) {
     const flag = flags[i]
-    setFlag(teamName, problemName, flag)
-    runExploit(teamName, problemName)
+    setFlag(workingDir, flag)
+    runExploit(workingDir, problem)
   }
 }
 
-const calcScore = (teamName, problemName, calcTime, runTime) => {
-  const flags = generateFlags(calcTime)
-  runExploits(teamName, problemName, calcTime, runTime)
-  const submittedFlags = getSubmittedFlags(teamName, problemName)
+const calcScore = (team, problem) => {
+  const flags = generateFlags(problem.calc_time)
+  runExploits(team, problem, flags)
+  const submittedFlags = getSubmittedFlags(team, problem)
 
   const correctFlags = flags.filter(flag => submittedFlags.includes(flag))
   return correctFlags.length
