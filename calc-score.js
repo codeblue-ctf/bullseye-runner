@@ -9,9 +9,9 @@ const loginRegistry = () => {
     'login',
     config.registry.server,
     '-u',
-    config.registry.usre.name,
+    config.registry.user.name,
     '-p',
-    config.registry.usre.password
+    config.registry.user.password
   ])
 }
 
