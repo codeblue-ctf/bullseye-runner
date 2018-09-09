@@ -2,7 +2,7 @@ const { spawnSync } = require('child_proces')
 const fs = require('fs')
 const path = require('path')
 const config = require('../config.js')
-const { generateFlags } = require('./lib/flagGenerator.js')
+const { generateFlags } = require('./lib/flag-generator.js')
 
 const loginRegistry = () => {
   spawnSync('docker', [
