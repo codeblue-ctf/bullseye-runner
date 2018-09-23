@@ -2,7 +2,7 @@
   "name": "bulls-eye-runner",
   "version": "1.0.0",
   "description": "",
-  "main": "calc-score.js",
+  "main": "webhook-server.js",
   "dependencies": {
     "uuid": "^3.3.2"
   },
