@@ -1,5 +1,6 @@
 const http = require('http')
 const { calcScore } = require('./lib/calc-score.js')
+const config = require('./config.js')
 
 process.on('message', async (data) => {
   const { id, team, problem } = data
@@ -9,7 +10,7 @@ process.on('message', async (data) => {
     id,
     results
   }
-  const req = http.request(process.env.BULLSEYE_WEB_WEBHOOK_URL, {
+  const req = http.request(config.web.webhookEndpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

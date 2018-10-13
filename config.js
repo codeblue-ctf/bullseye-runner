@@ -8,7 +8,7 @@ module.exports = {
       password: process.env.BULLSEYE_REGISTRY_ADMIN_PASSWORD || 'password'
     }
   },
-  bullseyeWeb: {
-    server: process.env.BULLSEYE_WEB_SERVER || 'web:3000'
+  web: {
+    webhookEndpoint: process.env.BULLSEYE_WEB_WEBHOOK_ENDPOINT || 'http://web:3000/webhook'
   }
 }
