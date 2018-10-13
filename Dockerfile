@@ -5,4 +5,4 @@ ADD ./package.json .
 RUN npm i
 
 ADD . /usr/local/bulls-eye-runner
-CMD ["npm", "run"]
+CMD ["npm", "start"]
