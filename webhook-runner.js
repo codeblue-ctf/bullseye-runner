@@ -12,7 +12,7 @@ process.on('message', async (data) => {
   const req = http.request(callback_url, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'.
+      'Content-Type': 'application/json',
       'Authorization': `Bearer ${callback_authorization_token}`
     }
   })
