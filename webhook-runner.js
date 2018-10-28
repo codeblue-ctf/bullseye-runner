@@ -1,4 +1,5 @@
 const http = require('http')
+const { URL } = require('url')
 const { calcScore } = require('./lib/calc-score.js')
 
 process.on('message', async (data) => {
@@ -9,7 +10,12 @@ process.on('message', async (data) => {
     id,
     results
   }
-  const req = http.request(callback_url, {
+  const url = new URL(callback_url)
+  const req = http.request({
+    hostname: url.hostname,
+    protocol: url.protocol,
+    port: url.port,
+    path: url.path,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
