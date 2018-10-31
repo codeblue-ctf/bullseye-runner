@@ -24,4 +24,5 @@ process.on('message', async (data) => {
   })
   req.write(JSON.stringify(postData))
   req.end()
+  console.debug('[postData]', JSON.stringify(postData))
 })
