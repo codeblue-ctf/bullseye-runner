@@ -15,8 +15,7 @@ process.on('message', async (data) => {
   const req = http.request({
     hostname: url.hostname,
     protocol: url.protocol,
-    port: url.port,
-    path: url.path,
+    path: url.pathname,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
