@@ -7,7 +7,7 @@ process.on('message', async (data) => {
   const { succeeded, failed } = await calcScore(data)
 
   const postData = {
-    id,
+    schedule_uuid: id,
     succeeded,
     failed
   }
