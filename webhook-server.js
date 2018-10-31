@@ -15,6 +15,7 @@ const server = http.createServer((req, res) => {
   })
   req.on('end', () => {
     try {
+      console.debug('[receivedData]', rawData)
       const data = JSON.parse(rawData)
       processData(data)
 
