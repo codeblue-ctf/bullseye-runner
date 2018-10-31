@@ -4,11 +4,12 @@ const { calcScore } = require('./lib/calc-score.js')
 
 process.on('message', async (data) => {
   const { id, callback_url, callback_authorization_token } = data
-  const results = await calcScore(data)
+  const { succeeded, failed } = await calcScore(data)
 
   const postData = {
     id,
-    results
+    succeeded,
+    failed
   }
   const url = new URL(callback_url)
   const req = http.request({
