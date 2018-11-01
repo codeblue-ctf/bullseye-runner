@@ -1,8 +1,9 @@
 const http = require('http')
 const { URL } = require('url')
 const { calcScore } = require('./lib/calc-score.js')
+const cluster = require('cluster')
 
-const webHookRun = async (data) => {
+process.on('message', async (data) => {
   const { id, callback_url, callback_authorization_token } = data
   const { succeeded, failed } = await calcScore(data)
 
@@ -26,8 +27,4 @@ const webHookRun = async (data) => {
   req.write(JSON.stringify(postData))
   req.end()
   console.debug('[postData]', JSON.stringify(postData))
-}
-
-module.exports = {
-  webHookRun
-}
+})
