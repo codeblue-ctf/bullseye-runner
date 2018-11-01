@@ -2,7 +2,7 @@ const http = require('http')
 const { URL } = require('url')
 const { calcScore } = require('./lib/calc-score.js')
 
-process.on('message', async (data) => {
+const webHookRun = async (data) => {
   const { id, callback_url, callback_authorization_token } = data
   const { succeeded, failed } = await calcScore(data)
 
@@ -11,6 +11,7 @@ process.on('message', async (data) => {
     succeeded,
     failed
   }
+
   const url = new URL(callback_url)
   const req = http.request({
     hostname: url.hostname,
@@ -25,4 +26,8 @@ process.on('message', async (data) => {
   req.write(JSON.stringify(postData))
   req.end()
   console.debug('[postData]', JSON.stringify(postData))
-})
+}
+
+module.exports = {
+  webHookRun
+}

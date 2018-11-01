@@ -1,6 +1,7 @@
 const http = require('http')
 const fs = require('fs')
-const child_process = require('child_process')
+const cluster = require('cluster')
+const { webHookRun } = require('./webhook-runner.js')
 
 const validData = (data) => {
   params = [
@@ -25,8 +26,16 @@ const validData = (data) => {
 const processData = (data) => {
   if (!validData(data)) throw 'invalid data';
 
-  const child = child_process.fork('./webhook-runner')
-  child.send(data)
+  (new Promise(async (resolve, reject) => {
+    try {
+      await webHookRun(data)
+      resolve()
+    } catch(e) {
+      reject(e)
+    }
+  })).catch((e) => {
+    console.error(e)
+  })
 }
 
 const server = http.createServer((req, res) => {
