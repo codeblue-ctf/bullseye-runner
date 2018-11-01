@@ -5,7 +5,7 @@ const cluster = require('cluster')
 
 console.log(cluster.isMaster)
 
-if (cluster.isMaster) { 
+if (cluster.isMaster) {
   process.on('message', async (data) => {
     const { id, callback_url, callback_authorization_token } = data
     const { succeeded, failed } = await calcScore(data)
