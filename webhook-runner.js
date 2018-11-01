@@ -3,7 +3,11 @@ const { URL } = require('url')
 const { calcScore } = require('./lib/calc-score.js')
 const cluster = require('cluster')
 
+console.log(cluster.isMaster)
+
 process.on('message', async (data) => {
+  if (cluster.isWorker) return;
+  
   const { id, callback_url, callback_authorization_token } = data
   const { succeeded, failed } = await calcScore(data)
 
@@ -27,4 +31,4 @@ process.on('message', async (data) => {
   req.write(JSON.stringify(postData))
   req.end()
   console.debug('[postData]', JSON.stringify(postData))
-})
+})  

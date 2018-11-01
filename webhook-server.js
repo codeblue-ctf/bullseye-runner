@@ -24,7 +24,7 @@ const validData = (data) => {
 const processData = (data) => {
   if (!validData(data)) throw 'invalid data';
 
-  const child = child_process.fork('./webhook-runner')
+  const child = require('child_process').fork('./webhook-runner')
   child.send(data)
 }
 
@@ -42,6 +42,7 @@ const server = http.createServer((req, res) => {
 
       res.end(JSON.stringify({'result': 'success'}))
     } catch(e) {
+      console.error(e)
       res.end(JSON.stringify({'result': 'failed'}))
     }
   })
