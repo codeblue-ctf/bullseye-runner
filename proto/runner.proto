@@ -1,0 +1,19 @@
+syntax = "proto3";
+package runner;
+
+message RunnerRequest {
+    string uuid = 1; // UUID
+    int32 timeout = 2; // millseconds
+    string docker_compose_yml = 3;
+    string docker_registry_token = 4;
+    string flag_template = 5;
+    string callback_url = 6;
+    string callback_auth_token = 7;
+}
+
+message RunnerResponse {
+    string uuid = 1; // UUID
+    bool succeeded = 2; // true if exploit is succeeded
+    string stdout = 3;
+    string stderr = 4;
+}
