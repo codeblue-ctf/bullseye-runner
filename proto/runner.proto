@@ -17,3 +17,7 @@ message RunnerResponse {
     string stdout = 3;
     string stderr = 4;
 }
+
+service Runner {
+    rpc Run (RunnerRequest) returns (RunnerResponse);
+}
