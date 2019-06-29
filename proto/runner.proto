@@ -7,8 +7,6 @@ message RunnerRequest {
     string docker_compose_yml = 3;
     string docker_registry_token = 4;
     string flag_template = 5;
-    string callback_url = 6;
-    string callback_auth_token = 7;
 }
 
 message RunnerResponse {
