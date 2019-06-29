@@ -5,12 +5,19 @@ BUILD := $(shell git rev-parse --short HEAD)
 LDFLAGS = -ldflags "-X=main.Build=$(BUILD)"
 
 .PHONY: build
-build: build-proto
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/runner $(LDFLAGS) -v ./src
+build: build-runner build-client
+
+.PHONY: build-runner
+build-runner: build-proto
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/runner $(LDFLAGS) -v ./runner
+
+.PHONY: build-client
+build-client: build-proto
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/client $(LDFLAGS) -v ./client
 
 .PHONY: build-proto
 build-proto: ./proto/*.proto
-	protoc -I ./proto --go_out=./src/proto ./proto/*.proto
+	protoc -I ./proto --go_out=plugins=grpc:./proto ./proto/*.proto
 
 .PHONY: clean
 clean:
