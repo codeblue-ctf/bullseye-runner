@@ -57,8 +57,6 @@ func main() {
 		DockerComposeYml:    `hoge`,
 		DockerRegistryToken: "test",
 		FlagTemplate:        "CBCTF{hoge}",
-		CallbackUrl:         "http://hogehoge",
-		CallbackAuthToken:   "test",
 	}
 
 	for i := 0; i < 10; i++ {
