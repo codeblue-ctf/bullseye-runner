@@ -61,6 +61,11 @@ func main() {
 		CallbackAuthToken:   "test",
 	}
 
-	sendRequest(client, &req)
+	for i := 0; i < 10; i++ {
+		go sendRequest(client, &req)
+		time.Sleep(1 * time.Second)
+	}
+
+	time.Sleep(60 * time.Second)
 
 }

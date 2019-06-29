@@ -20,8 +20,7 @@ var (
 	port     = flag.Int("port", 10080, "port to listen")
 )
 
-type runnerServer struct {
-}
+type runnerServer struct{}
 
 func (s *runnerServer) Run(ctx context.Context, req *pb.RunnerRequest) (*pb.RunnerResponse, error) {
 	log.Printf("received")
