@@ -35,7 +35,7 @@ func setupDirectory(yml string, flag string) (string, error) {
 }
 
 func runDockerCompose(dir string, timeout int32) (bool, string, error) {
-	log.Printf("start evaluation")
+	log.Printf("start evaluation: %s", dir)
 
 	exec.Command("docker-compose", "up", "-d").Run()
 	time.Sleep(time.Duration(timeout) * time.Millisecond)
@@ -55,7 +55,7 @@ func runDockerCompose(dir string, timeout int32) (bool, string, error) {
 		return false, "", err
 	}
 
-	log.Printf("end evaluation")
+	log.Printf("end evaluation: %s", dir)
 
 	if success {
 		return true, buf.String(), nil
