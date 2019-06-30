@@ -70,7 +70,7 @@ services:
       - "./flag:/flag"
     expose:
       - "8080"
-`,
+`[1:],
 		DockerRegistryToken: "test",
 		FlagTemplate:        "CBCTF{hoge}",
 	}
