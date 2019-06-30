@@ -12,8 +12,7 @@ message RunnerRequest {
 message RunnerResponse {
     string uuid = 1; // UUID
     bool succeeded = 2; // true if exploit is succeeded
-    string stdout = 3;
-    string stderr = 4;
+    string output = 3;
 }
 
 service Runner {

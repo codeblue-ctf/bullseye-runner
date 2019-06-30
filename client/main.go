@@ -52,18 +52,36 @@ func main() {
 	client := pb.NewRunnerClient(conn)
 
 	req := pb.RunnerRequest{
-		Uuid:                "hoge",
-		Timeout:             1000,
-		DockerComposeYml:    `hoge`,
+		Uuid:    "hoge",
+		Timeout: 1000,
+		DockerComposeYml: `
+version: '3'
+
+services:
+  exploit:
+    image: localhost:8080/test/exploit
+    volumes:
+      - "./submitted-flag:flag"
+    depends_on:
+      - challenge
+  challenge:
+    image: localhost:8080/test/challenge
+    volumes:
+      - "./flag:/flag"
+    expose:
+      - "8080"
+`,
 		DockerRegistryToken: "test",
 		FlagTemplate:        "CBCTF{hoge}",
 	}
 
-	for i := 0; i < 10; i++ {
-		go sendRequest(client, &req)
-		time.Sleep(1 * time.Second)
-	}
+	sendRequest(client, &req)
 
-	time.Sleep(60 * time.Second)
+	// for i := 0; i < 10; i++ {
+	// 	go sendRequest(client, &req)
+	// 	time.Sleep(1 * time.Second)
+	// }
+
+	// time.Sleep(60 * time.Second)
 
 }

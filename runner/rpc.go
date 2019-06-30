@@ -1,9 +1,8 @@
-package runner
+package main
 
 import (
 	"context"
 	"log"
-	"time"
 
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
@@ -11,17 +10,12 @@ import (
 type runnerServer struct{}
 
 func (s *runnerServer) Run(ctx context.Context, req *pb.RunnerRequest) (*pb.RunnerResponse, error) {
-	log.Printf("received")
+	log.Printf("received: %v", req)
 
-	time.Sleep(3 * time.Second)
-
-	log.Printf("uuid: %s", req.Uuid)
-
-	res := pb.RunnerResponse{
-		Uuid:      req.Uuid,
-		Succeeded: true,
-		Stdout:    "stdout",
-		Stderr:    "stderr",
+	res, err := RunRequest(ctx, req)
+	if err != nil {
+		log.Printf("error: %v", err)
+		return nil, err
 	}
-	return &res, nil
+	return res, nil
 }
