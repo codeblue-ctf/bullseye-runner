@@ -5,11 +5,11 @@ BUILD := $(shell git rev-parse --short HEAD)
 LDFLAGS = -ldflags "-X=main.Build=$(BUILD)"
 
 .PHONY: build
-build: build-runner build-client
+build: build-worker build-client
 
-.PHONY: build-runner
-build-runner: build-proto
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/runner $(LDFLAGS) -v ./runner
+.PHONY: build-worker
+build-worker: build-proto
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/runner-worker $(LDFLAGS) -v ./worker
 
 .PHONY: build-client
 build-client: build-proto

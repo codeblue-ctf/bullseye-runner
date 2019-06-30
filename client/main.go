@@ -54,17 +54,18 @@ func main() {
 	req := pb.RunnerRequest{
 		Uuid:    "hoge",
 		Timeout: 1000,
-		DockerComposeYml: `version: '3'
+		DockerComposeYml: `
+version: '3'
 
 services:
   exploit:
-    image: localhost:8080/test/exploit
+    image: bullseye-test-exploit
     volumes:
       - "./submitted-flag:flag"
     depends_on:
       - challenge
   challenge:
-    image: localhost:8080/test/challenge
+    image: bullseye-test-challenge
     volumes:
       - "./flag:/flag"
     expose:
