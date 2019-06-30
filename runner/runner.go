@@ -14,7 +14,7 @@ import (
 )
 
 func setupDirectory(yml string, flag string) (string, error) {
-	dir, err := ioutil.TempDir("tmp", "bullseye-runner-")
+	dir, err := ioutil.TempDir("./tmp", "bullseye-runner-")
 	if err != nil {
 		return "", err
 	}
@@ -34,21 +34,53 @@ func setupDirectory(yml string, flag string) (string, error) {
 	return dir, nil
 }
 
+func runCommand(args ...string) error {
+	cmd := exec.Command(args[0], args[1:]...)
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+
+	err := cmd.Run()
+
+	log.Printf("%s %s, stdout: %#v", args[0], args[1:], stdout.String())
+	log.Printf("%s %s, stderr: %#v", args[0], args[1:], stderr.String())
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func runDockerCompose(dir string, timeout int32) (bool, string, error) {
 	log.Printf("start evaluation: %s", dir)
 
-	exec.Command("docker-compose", "up", "-d").Run()
-	time.Sleep(time.Duration(timeout) * time.Millisecond)
-	exec.Command("docker-compose", "kill").Run()
-	cmd := exec.Command("docker-compose", "logs")
-	stdout, err := cmd.StdoutPipe()
+	err := runCommand("docker-compose", "up", "-d")
 	if err != nil {
-		log.Printf("failed to get log")
+		return false, "", err
 	}
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(stdout)
 
-	exec.Command("docker-compose", "down").Run()
+	time.Sleep(time.Duration(timeout) * time.Millisecond)
+
+	err = runCommand("docker-compose", "kill")
+	if err != nil {
+		return false, "", err
+	}
+
+	cmd := exec.Command("docker-compose", "logs")
+	output := new(bytes.Buffer)
+	cmd.Stdout = output
+
+	err = cmd.Run()
+	if err != nil {
+		return false, "", err
+	}
+
+	err = runCommand("docker-compose", "down")
+	if err != nil {
+		return false, "", err
+	}
 
 	success, err := checkFlag(dir)
 	if err != nil {
@@ -58,10 +90,10 @@ func runDockerCompose(dir string, timeout int32) (bool, string, error) {
 	log.Printf("end evaluation: %s", dir)
 
 	if success {
-		return true, buf.String(), nil
+		return true, output.String(), nil
 	}
 
-	return false, buf.String(), nil
+	return false, output.String(), nil
 }
 
 func checkFlag(dir string) (bool, error) {

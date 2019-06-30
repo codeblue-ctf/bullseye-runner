@@ -54,8 +54,7 @@ func main() {
 	req := pb.RunnerRequest{
 		Uuid:    "hoge",
 		Timeout: 1000,
-		DockerComposeYml: `
-version: '3'
+		DockerComposeYml: `version: '3'
 
 services:
   exploit:
