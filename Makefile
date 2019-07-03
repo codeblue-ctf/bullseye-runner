@@ -9,15 +9,15 @@ build: build-master build-worker build-client
 
 .PHONY: build-master
 build-master: build-proto
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/runner-master $(LDFLAGS) -v ./master
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/runner-master $(LDFLAGS) -v ./cmd/master
 
 .PHONY: build-worker
 build-worker: build-proto
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/runner-worker $(LDFLAGS) -v ./worker
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/runner-worker $(LDFLAGS) -v ./cmd/worker
 
 .PHONY: build-client
 build-client: build-proto
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/client $(LDFLAGS) -v ./client
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/client $(LDFLAGS) -v ./cmd/client
 
 .PHONY: build-proto
 build-proto: ./proto/*.proto

@@ -10,6 +10,8 @@ import (
 
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 	"google.golang.org/grpc"
+
+	"gitlab.com/CBCTF/bullseye-runner/pkg/worker"
 )
 
 var (
@@ -37,6 +39,6 @@ func main() {
 	}
 
 	server := grpc.NewServer(opts...)
-	pb.RegisterRunnerServer(server, &runnerServer{})
+	pb.RegisterRunnerServer(server, &worker.RunnerServer{})
 	server.Serve(lis)
 }

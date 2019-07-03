@@ -1,5 +1,5 @@
 syntax = "proto3";
-package runner;
+package proto;
 
 message RunnerRequest {
     string uuid = 1; // UUID

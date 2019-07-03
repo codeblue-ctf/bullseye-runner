@@ -1,4 +1,4 @@
-package main
+package worker
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
 
-type runnerServer struct{}
+type RunnerServer struct{}
 
-func (s *runnerServer) Run(ctx context.Context, req *pb.RunnerRequest) (*pb.RunnerResponse, error) {
+func (s *RunnerServer) Run(ctx context.Context, req *pb.RunnerRequest) (*pb.RunnerResponse, error) {
 	log.Printf("received: %v", req)
 
 	res, err := RunRequest(ctx, req)
