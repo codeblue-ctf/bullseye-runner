@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 
 	"google.golang.org/grpc/credentials"
 
@@ -20,12 +21,20 @@ var (
 	port     = flag.Int("port", 10080, "port to listen")
 )
 
+const Tempdir = "./tmp"
+
 func main() {
 	flag.Parse()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
+	}
+
+	if _, err = os.Stat(Tempdir); err != nil {
+		if err2 := os.Mkdir(Tempdir, 0755); err2 != nil {
+			log.Fatalf("failed to create directory: %s", Tempdir)
+		}
 	}
 
 	var opts []grpc.ServerOption
