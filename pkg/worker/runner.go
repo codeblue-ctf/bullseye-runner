@@ -5,6 +5,7 @@ import (
 	"context"
 	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
 	"path"
 	"strings"
@@ -56,7 +57,16 @@ func runCommand(args ...string) error {
 func runDockerCompose(dir string, timeout int32) (bool, string, error) {
 	log.Printf("start evaluation: %s", dir)
 
-	err := runCommand("docker-compose", "up", "-d")
+	curdir, err := os.Getwd()
+	if err != nil {
+		return false, "", err
+	}
+	if err := os.Chdir(dir); err != nil {
+		return false, "", err
+	}
+	defer os.Chdir(curdir)
+
+	err = runCommand("docker-compose", "up", "-d")
 	if err != nil {
 		return false, "", err
 	}
