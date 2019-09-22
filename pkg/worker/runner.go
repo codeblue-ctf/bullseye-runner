@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lucasjones/reggen"
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
 
@@ -104,6 +105,14 @@ func runDockerCompose(dir string, timeout int32) (bool, string, error) {
 	}
 
 	return false, output.String(), nil
+}
+
+func GenerateFlag(template string) (string, error) {
+	g, err := reggen.NewGenerator(template)
+	if err != nil {
+		return "", err
+	}
+	return g.Generate(10), nil
 }
 
 func checkFlag(dir string) (bool, error) {
