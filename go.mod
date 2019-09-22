@@ -8,8 +8,9 @@ require (
 	github.com/alecthomas/units v0.0.0-20190910110746-680d30ca3117 // indirect
 	github.com/containerd/continuity v0.0.0-20190827140505-75bee3e2ccb6 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
-	github.com/docker/cli v0.0.0-20190916194909-f429e4bfd95d // indirect
-	github.com/docker/docker v1.13.1 // indirect
+	github.com/docker/cli v0.0.0-20190916194909-f429e4bfd95d
+	github.com/docker/docker v1.13.1
+	github.com/docker/engine-api v0.4.0
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/libcompose v0.4.1-0.20190808084053-143e0f3f1ab9
