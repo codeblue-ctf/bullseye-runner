@@ -11,8 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
+	"github.com/docker/libcompose/docker"
+	"github.com/docker/libcompose/docker/ctx"
+	"github.com/docker/libcompose/project"
 
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
@@ -132,6 +133,20 @@ func checkFlag(dir string) (bool, error) {
 	return false, nil
 }
 
+func dummy() {
+	_, err := docker.NewProject(&ctx.Context{
+		Context: project.Context{
+			ComposeFiles: []string{"hoge"},
+			ProjectName:  "unko",
+		},
+	}, nil)
+
+	if err != nil {
+		panic(err)
+	}
+
+}
+
 // run docker-compose.yml and return results as RunnerResponse
 func RunRequest(ctx context.Context, req *pb.RunnerRequest) (*pb.RunnerResponse, error) {
 	dir, err := setupDirectory(req.DockerComposeYml, req.FlagTemplate)
@@ -139,20 +154,20 @@ func RunRequest(ctx context.Context, req *pb.RunnerRequest) (*pb.RunnerResponse,
 		return nil, err
 	}
 
-	cli, err := client.NewEnvClient()
-	if err != nil {
-		log.Fatalf("failed to initialize client: %v", err)
-	}
+	// cli, err := client.NewEnvClient()
+	// if err != nil {
+	// 	log.Fatalf("failed to initialize client: %v", err)
+	// }
 
-	ok, err := cli.RegistryLogin(ctx, types.AuthConfig{
-		Username:      "admin",
-		Password:      "password",
-		ServerAddress: "localhost:5000",
-	})
-	if err != nil {
-		log.Fatalf("failed to login: %v", err)
-	}
-	log.Printf("successfully logged in: %s", ok.Status)
+	// ok, err := cli.RegistryLogin(ctx, types.AuthConfig{
+	// 	Username:      "admin",
+	// 	Password:      "password",
+	// 	ServerAddress: "localhost:5000",
+	// })
+	// if err != nil {
+	// 	log.Fatalf("failed to login: %v", err)
+	// }
+	// log.Printf("successfully logged in: %s", ok.Status)
 
 	succeeded, output, err := runDockerCompose(dir, req.Timeout)
 	if err != nil {
