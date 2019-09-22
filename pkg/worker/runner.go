@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
+
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
 
@@ -135,6 +138,21 @@ func RunRequest(ctx context.Context, req *pb.RunnerRequest) (*pb.RunnerResponse,
 	if err != nil {
 		return nil, err
 	}
+
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		log.Fatalf("failed to initialize client: %v", err)
+	}
+
+	ok, err := cli.RegistryLogin(ctx, types.AuthConfig{
+		Username:      "admin",
+		Password:      "password",
+		ServerAddress: "localhost:5000",
+	})
+	if err != nil {
+		log.Fatalf("failed to login: %v", err)
+	}
+	log.Printf("successfully logged in: %s", ok.Status)
 
 	succeeded, output, err := runDockerCompose(dir, req.Timeout)
 	if err != nil {
