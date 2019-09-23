@@ -1,4 +1,5 @@
 FROM scratch
 
-COPY server /
+ADD flag /
+ADD server /
 CMD ["/server"]

@@ -1,8 +1,12 @@
 package worker
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"log"
+	"os"
+	"text/template"
 	"time"
 
 	"github.com/docker/cli/cli/config/configfile"
@@ -17,14 +21,53 @@ import (
 )
 
 func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string, error) {
-	yml := req.DockerComposeYml
+	flagPath := fmt.Sprintf("/tmp/%s-flag", req.Uuid)
+	submitPath := fmt.Sprintf("/tmp/%s-submit", req.Uuid)
+
+	// generate flag from regex
+	flagStr, err := GenerateFlag(req.FlagTemplate)
+	if err != nil {
+		return false, "", err
+	}
+	log.Printf("generated flag: %s", flagStr)
+
+	flagFile, err := os.Create(flagPath)
+	defer flagFile.Close()
+	if err != nil {
+		return false, "", err
+	}
+	flagFile.WriteString(flagStr)
+
+	submitFile, err := os.Create(submitPath)
+	err = submitFile.Close()
+	if err != nil {
+		return false, "", err
+	}
+
+	var yml bytes.Buffer
+	tpl, err := template.New("yml").Parse(req.DockerComposeYml)
+	if err != nil {
+		return false, "", err
+	}
+
+	dict := map[string]string{
+		"flagPath":   flagPath,
+		"submitPath": submitPath,
+	}
+
+	err = tpl.Execute(&yml, dict)
+	if err != nil {
+		return false, "", err
+	}
+
+	log.Printf("execute yml: %s", yml.String())
 
 	configFile := &configfile.ConfigFile{
 		AuthConfigs: map[string]clitypes.AuthConfig{
 			"localhost:5000": clitypes.AuthConfig{
-				// Username: "admin",
-				// Password: "password",
-				Auth:          req.DockerRegistryToken,
+				Username: "admin",
+				Password: "password",
+				// Auth:          req.DockerRegistryToken,
 				ServerAddress: "localhost:5000",
 			},
 		},
@@ -32,7 +75,7 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 
 	project, err := docker.NewProject(&dockerctx.Context{
 		Context: project.Context{
-			ComposeBytes: [][]byte{[]byte(yml)},
+			ComposeBytes: [][]byte{yml.Bytes()},
 			ProjectName:  req.Uuid,
 		},
 		ConfigFile: configFile,
