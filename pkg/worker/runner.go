@@ -3,6 +3,7 @@ package worker
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -93,16 +94,16 @@ func runDockerCompose(dir string, timeout int32) (bool, string, error) {
 		return false, "", err
 	}
 
-	success, err := checkFlag(dir)
-	if err != nil {
-		return false, "", err
-	}
+	// success, err := checkFlag(dir)
+	// if err != nil {
+	// 	return false, "", err
+	// }
 
-	log.Printf("end evaluation: %s", dir)
+	// log.Printf("end evaluation: %s", dir)
 
-	if success {
-		return true, output.String(), nil
-	}
+	// if success {
+	// 	return true, output.String(), nil
+	// }
 
 	return false, output.String(), nil
 }
@@ -115,25 +116,30 @@ func GenerateFlag(template string) (string, error) {
 	return g.Generate(10), nil
 }
 
-func checkFlag(dir string) (bool, error) {
-	submittedFlag, err := ioutil.ReadFile(path.Join(dir, "submitted-flag"))
+func trim(s []byte) string {
+	return strings.Trim(fmt.Sprintf("%s", s), " \x00\r\n")
+}
+
+func CheckFlag(flagPath, submitPath string) (bool, error) {
+	submitBytes, err := ioutil.ReadFile(submitPath)
 	if err != nil {
 		log.Printf("failed to open submitted flag")
 		return false, err
 	}
 
-	flag, err := ioutil.ReadFile(path.Join(dir, "flag"))
+	flagBytes, err := ioutil.ReadFile(flagPath)
 	if err != nil {
 		log.Printf("failed to open flag")
 		return false, err
 	}
+	submitStr := trim(submitBytes)
+	flagStr := trim(flagBytes)
 
-	trimmed := strings.TrimSpace(string(submittedFlag))
-	trimmed = strings.Trim(trimmed, "\r\n")
-
-	if trimmed == string(flag) {
+	if submitStr == flagStr {
+		log.Printf("correct flag: %s", flagStr)
 		return true, nil
 	}
+	log.Printf("incorrect flag: %#v (!= %#v)", submitStr, flagStr)
 
 	return false, nil
 }

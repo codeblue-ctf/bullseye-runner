@@ -24,7 +24,7 @@ func sendRequest(client pb.RunnerClient, req *pb.RunnerRequest) (*pb.RunnerRespo
 	if err != nil {
 		log.Fatalf("%v.Run(_) = _, %v", client, err)
 	}
-	log.Printf("%v", res)
+	log.Printf("%+v", res)
 
 	return nil, nil
 }

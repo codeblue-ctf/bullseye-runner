@@ -103,5 +103,13 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 		return false, "", err
 	}
 
+	ok, err := CheckFlag(flagPath, submitPath)
+	if err != nil {
+		return false, "", err
+	}
+	if ok {
+		return true, "", nil
+	}
+
 	return false, "", nil
 }

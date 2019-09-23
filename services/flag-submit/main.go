@@ -35,12 +35,12 @@ func main() {
 	}
 
 	buf := make([]byte, 1024)
-	_, err = conn.Read(buf)
+	n, err := conn.Read(buf)
 	if err != nil {
 		log.Fatalf("failed to read: %v", err)
 	}
 
-	_, err = file.Write(buf)
+	_, err = file.Write(buf[:n])
 	if err != nil {
 		log.Fatalf("failed to write: %v", err)
 	}
