@@ -11,6 +11,8 @@ import (
 
 	"github.com/docker/cli/cli/config/configfile"
 	clitypes "github.com/docker/cli/cli/config/types"
+	apitypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"github.com/docker/libcompose/docker"
 	"github.com/docker/libcompose/docker/auth"
 	dockerctx "github.com/docker/libcompose/docker/ctx"
@@ -81,6 +83,16 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 		ConfigFile: configFile,
 		AuthLookup: auth.NewConfigLookup(configFile),
 	}, nil)
+	if err != nil {
+		return false, "", err
+	}
+
+	// create network in advance to make evaluation faster
+	client, err := client.NewEnvClient()
+	if err != nil {
+		return false, "", err
+	}
+	_, err = client.NetworkCreate(context.Background(), fmt.Sprintf("%s_default", req.Uuid), apitypes.NetworkCreate{})
 	if err != nil {
 		return false, "", err
 	}

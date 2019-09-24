@@ -63,9 +63,6 @@ services:
     depends_on:
       - challenge
       - flag-submit
-    links:
-      - challenge
-      - flag-submit
   challenge:
     image: localhost:5000/test-challenge
     volumes:
