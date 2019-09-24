@@ -33,17 +33,23 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	log.Printf("generated flag: %s", flagStr)
 
 	flagFile, err := os.Create(flagPath)
-	defer flagFile.Close()
 	if err != nil {
 		return false, "", err
 	}
-	flagFile.WriteString(flagStr)
+	_, err = flagFile.WriteString(flagStr)
+	if err != nil {
+		return false, "", err
+	}
+	if err = flagFile.Close(); err != nil {
+		return false, "", err
+	}
 
 	submitFile, err := os.Create(submitPath)
-	err = submitFile.Close()
-	if err != nil {
+	if err = submitFile.Close(); err != nil {
 		return false, "", err
 	}
+
+	defer Cleanup(req.Uuid)
 
 	var yml bytes.Buffer
 	tpl, err := template.New("yml").Parse(req.DockerComposeYml)
@@ -120,7 +126,6 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	}
 
 	ok, err := CheckFlag(req.Uuid)
-	defer Cleanup(req.Uuid)
 
 	if err != nil {
 		return false, "", err
