@@ -23,8 +23,7 @@ import (
 )
 
 func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string, error) {
-	flagPath := fmt.Sprintf("/tmp/%s-flag", req.Uuid)
-	submitPath := fmt.Sprintf("/tmp/%s-submit", req.Uuid)
+	flagPath, submitPath := GetFlagPaths(req.Uuid)
 
 	// generate flag from regex
 	flagStr, err := GenerateFlag(req.FlagTemplate)
@@ -115,7 +114,9 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 		return false, "", err
 	}
 
-	ok, err := CheckFlag(flagPath, submitPath)
+	ok, err := CheckFlag(req.Uuid)
+	defer Cleanup(req.Uuid)
+
 	if err != nil {
 		return false, "", err
 	}

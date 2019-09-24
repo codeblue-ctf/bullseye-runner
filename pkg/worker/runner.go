@@ -16,6 +16,12 @@ import (
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
 
+const (
+	TempDir      = "/tmp"
+	FlagSuffix   = "flag"
+	SubmitSuffix = "submit"
+)
+
 func setupDirectory(yml string, flag string) (string, error) {
 	dir, err := ioutil.TempDir("./tmp", "bullseye-runner-")
 	if err != nil {
@@ -120,7 +126,13 @@ func trim(s []byte) string {
 	return strings.Trim(fmt.Sprintf("%s", s), " \x00\r\n")
 }
 
-func CheckFlag(flagPath, submitPath string) (bool, error) {
+func GetFlagPaths(uuid string) (string, string) {
+	return fmt.Sprintf("%s/%s-%s", TempDir, uuid, FlagSuffix), fmt.Sprintf("%s/%s-%s", TempDir, uuid, SubmitSuffix)
+}
+
+func CheckFlag(uuid string) (bool, error) {
+	flagPath, submitPath := GetFlagPaths(uuid)
+
 	submitBytes, err := ioutil.ReadFile(submitPath)
 	if err != nil {
 		log.Printf("failed to open submitted flag")
@@ -142,6 +154,17 @@ func CheckFlag(flagPath, submitPath string) (bool, error) {
 	log.Printf("incorrect flag: %#v (!= %#v)", submitStr, flagStr)
 
 	return false, nil
+}
+
+func Cleanup(uuid string) error {
+	flagPath, submitPath := GetFlagPaths(uuid)
+	if err := os.Remove(flagPath); err != nil {
+		return err
+	}
+	if err := os.Remove(submitPath); err != nil {
+		return err
+	}
+	return nil
 }
 
 // run received yml and return results as RunnerResponse
