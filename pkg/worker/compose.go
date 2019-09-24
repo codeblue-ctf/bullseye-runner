@@ -91,7 +91,9 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	if err != nil {
 		return false, "", err
 	}
-	_, err = client.NetworkCreate(context.Background(), fmt.Sprintf("%s_default", req.Uuid), apitypes.NetworkCreate{})
+	networkName := fmt.Sprintf("%s_default", req.Uuid)
+	_, err = client.NetworkCreate(ctx, networkName, apitypes.NetworkCreate{})
+	defer client.NetworkRemove(ctx, networkName)
 	if err != nil {
 		return false, "", err
 	}
@@ -104,7 +106,10 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 
 	time.Sleep(time.Duration(req.Timeout) * time.Millisecond)
 
-	err = project.Down(ctx, options.Down{})
+	err = project.Delete(ctx, options.Delete{
+		RemoveVolume:  true,
+		RemoveRunning: true,
+	})
 	if err != nil {
 		return false, "", err
 	}
