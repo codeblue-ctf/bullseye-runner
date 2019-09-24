@@ -16,7 +16,13 @@ New Bull's Eye Runner implemented in Golang
 - protobuf
 
 ## Usage
-run `make`
+- run `make`
+- binary would be generated under `bin/`
+  - `runner-master`
+  - `runner-worker`
+    - worker binary listening gRPC connection from runner-master
+  - `client`
+    - test client for runner-worker
 
 ## TODO
 - scheduler in runner-master
