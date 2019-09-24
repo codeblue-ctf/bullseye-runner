@@ -61,7 +61,7 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 		return false, "", err
 	}
 
-	log.Printf("execute yml: %s", yml.String())
+	log.Printf("execute yml: %#v", yml.String())
 
 	configFile := &configfile.ConfigFile{
 		AuthConfigs: map[string]clitypes.AuthConfig{
