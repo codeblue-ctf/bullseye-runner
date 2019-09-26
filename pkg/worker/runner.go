@@ -156,7 +156,40 @@ func CheckFlag(uuid string) (bool, error) {
 	return false, nil
 }
 
-func Cleanup(uuid string) error {
+func PrepareFlags(uuid, template string) (string, string, error) {
+	flagPath, submitPath := GetFlagPaths(uuid)
+
+	// generate flag from template regex
+	flagStr, err := GenerateFlag(template)
+	if err != nil {
+		log.Printf("failed to generate flag: %v", err)
+		return "", "", err
+	}
+	log.Printf("generated flag: %s", flagStr)
+
+	// write generated flag
+	flagFile, err := os.Create(flagPath)
+	if err != nil {
+		return "", "", err
+	}
+	_, err = flagFile.WriteString(flagStr)
+	if err != nil {
+		return "", "", err
+	}
+	if err = flagFile.Close(); err != nil {
+		return "", "", err
+	}
+
+	// create empty flag for submittion
+	submitFile, err := os.Create(submitPath)
+	if err = submitFile.Close(); err != nil {
+		return "", "", err
+	}
+
+	return flagPath, submitPath, nil
+}
+
+func CleanFlags(uuid string) error {
 	flagPath, submitPath := GetFlagPaths(uuid)
 	if err := os.Remove(flagPath); err != nil {
 		return err

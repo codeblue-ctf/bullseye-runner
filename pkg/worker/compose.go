@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"text/template"
 	"time"
 
@@ -22,34 +21,37 @@ import (
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
 
+func getNeworkID(uuid string) string {
+	return fmt.Sprintf("%s_default", uuid)
+}
+
+func cleanNetwork(req *pb.RunnerRequest) error {
+	networkID := getNeworkID(req.Uuid)
+	client, err := client.NewEnvClient()
+	if err != nil {
+		return err
+	}
+	if err := client.NetworkRemove(context.Background(), networkID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func cleanCompose(req *pb.RunnerRequest, project project.APIProject) {
+	project.Delete(context.Background(), options.Delete{
+		RemoveVolume:  true,
+		RemoveRunning: true,
+	})
+	cleanNetwork(req)
+}
+
 func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string, error) {
-	flagPath, submitPath := GetFlagPaths(req.Uuid)
-
-	// generate flag from regex
-	flagStr, err := GenerateFlag(req.FlagTemplate)
+	flagPath, submitPath, err := PrepareFlags(req.Uuid, req.FlagTemplate)
 	if err != nil {
 		return false, "", err
 	}
-	log.Printf("generated flag: %s", flagStr)
-
-	flagFile, err := os.Create(flagPath)
-	if err != nil {
-		return false, "", err
-	}
-	_, err = flagFile.WriteString(flagStr)
-	if err != nil {
-		return false, "", err
-	}
-	if err = flagFile.Close(); err != nil {
-		return false, "", err
-	}
-
-	submitFile, err := os.Create(submitPath)
-	if err = submitFile.Close(); err != nil {
-		return false, "", err
-	}
-
-	defer Cleanup(req.Uuid)
+	defer CleanFlags(req.Uuid)
 
 	var yml bytes.Buffer
 	tpl, err := template.New("yml").Parse(req.DockerComposeYml)
@@ -97,9 +99,8 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	if err != nil {
 		return false, "", err
 	}
-	networkName := fmt.Sprintf("%s_default", req.Uuid)
-	_, err = client.NetworkCreate(ctx, networkName, apitypes.NetworkCreate{})
-	defer client.NetworkRemove(ctx, networkName)
+	networkID := getNeworkID(req.Uuid)
+	_, err = client.NetworkCreate(ctx, networkID, apitypes.NetworkCreate{})
 	if err != nil {
 		return false, "", err
 	}
@@ -109,19 +110,13 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 		log.Printf("failed to up: %v", err)
 		return false, "", err
 	}
+	defer cleanCompose(req, project)
 
 	time.Sleep(time.Duration(req.Timeout) * time.Millisecond)
 
-	err = project.Delete(ctx, options.Delete{
-		RemoveVolume:  true,
-		RemoveRunning: true,
-	})
+	err = project.Log(ctx, false)
 	if err != nil {
-		return false, "", err
-	}
-
-	err = project.Kill(ctx, "KILL")
-	if err != nil {
+		log.Printf("failed to get log: %v", err)
 		return false, "", err
 	}
 
