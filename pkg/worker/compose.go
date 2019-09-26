@@ -25,6 +25,22 @@ func getNeworkID(uuid string) string {
 	return fmt.Sprintf("%s_default", uuid)
 }
 
+func prepareNetwork(ctx context.Context, req *pb.RunnerRequest) error {
+	networkID := getNeworkID(req.Uuid)
+	client, err := client.NewEnvClient()
+	if err != nil {
+		log.Printf("failed to create env client: %v", err)
+		return err
+	}
+	_, err = client.NetworkCreate(ctx, networkID, apitypes.NetworkCreate{})
+	if err != nil {
+		log.Printf("failed to create network: %v", err)
+		return err
+	}
+
+	return nil
+}
+
 func cleanNetwork(req *pb.RunnerRequest) error {
 	networkID := getNeworkID(req.Uuid)
 	client, err := client.NewEnvClient()
@@ -95,13 +111,7 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	}
 
 	// create network in advance to make evaluation faster
-	client, err := client.NewEnvClient()
-	if err != nil {
-		return false, "", err
-	}
-	networkID := getNeworkID(req.Uuid)
-	_, err = client.NetworkCreate(ctx, networkID, apitypes.NetworkCreate{})
-	if err != nil {
+	if err := prepareNetwork(ctx, req); err != nil {
 		return false, "", err
 	}
 
