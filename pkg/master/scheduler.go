@@ -3,6 +3,8 @@ package master
 import (
 	"context"
 	"log"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -11,7 +13,8 @@ import (
 )
 
 var (
-	processes map[uint]context.CancelFunc
+	mutex     sync.Mutex
+	processes map[string]context.CancelFunc
 )
 
 func RunScheduler(db *gorm.DB) {
@@ -76,6 +79,8 @@ func RunScheduler(db *gorm.DB) {
 func doSchedule(db *gorm.DB, pool *ConnPool) error {
 	var rounds []Round
 
+	log.Printf("checking rounds")
+
 	// find past unexecuted round
 	db.Select(rounds).Where("start_at <= ?", time.Now())
 
@@ -95,7 +100,8 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 		}
 
 		for i := 0; i < int(round.Ntrials); i++ {
-			workerhost := round.WorkerHosts[i%len(round.WorkerHosts)]
+			workerHosts := strings.Split(round.WorkerHosts, ",")
+			workerhost := workerHosts[i%len(workerHosts)]
 
 			pbcli, err := pool.GetConn(workerhost)
 			if err != nil {
@@ -107,7 +113,10 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 			}
 			db.Create(result)
 
-			uuid := "hoge" // TODO
+			uuid, err := NewUUID()
+			if err != nil {
+				return err
+			}
 
 			req := &pb.RunnerRequest{
 				Uuid:          uuid,
@@ -118,13 +127,20 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
-			if _, ok := processes[round.ID]; ok == true {
-				log.Printf("round %d is ongoing", round.ID)
+			if _, ok := processes[uuid]; ok == true {
+				log.Printf("worker %s is ongoing", uuid)
 				continue
 			}
-			processes[round.ID] = cancel
+			processes[uuid] = cancel
 
 			go func(ctx context.Context) {
+				defer func() { // cleanup
+					mutex.Lock()
+					if _, ok := processes[uuid]; ok == true {
+						delete(processes, uuid)
+					}
+					mutex.Unlock()
+				}()
 				res, err := SendRequest(pb.NewRunnerClient(pbcli), req, ctx)
 				if err != nil {
 					log.Printf("%v.Run(_) = _, %+v", err)

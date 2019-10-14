@@ -14,7 +14,7 @@ type Schedule struct {
 	Interval     uint      `json:"interval"`
 	Ntrials      uint      `json:"ntrials"`
 	Timeout      uint      `json:"timeout"`
-	WorkerHosts  []string  `json:"worker_hosts"`
+	WorkerHosts  string    `json:"worker_hosts"`
 	CallbackURL  string    `json:"callback_url"`
 	ProblemID    string    `json:"problem_id"`
 	TeamID       string    `json:"team_id"`
@@ -28,7 +28,7 @@ type Round struct {
 	FlagTemplate string    `json:"flag_template"`
 	Ntrials      uint      `json:"ntrials"`
 	Timeout      uint      `json:"timeout"`
-	WorkerHosts  []string  `json:"worker_hosts"`
+	WorkerHosts  string    `json:"worker_hosts"`
 	CallbackURL  string    `json:"callback_url"`
 	ProblemID    string    `json:"problem_id"`
 	TeamID       string    `json:"team_id"`

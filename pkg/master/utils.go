@@ -2,6 +2,8 @@ package master
 
 import (
 	"bytes"
+	"crypto/rand"
+	"fmt"
 	"reflect"
 	"regexp"
 	"text/template"
@@ -44,4 +46,12 @@ func EscapedTemplate(s string, params interface{}) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func NewUUID() (string, error) {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%04x-%02x-%02x-%02x-%06x", buf[:4], buf[4:6], buf[6:8], buf[8:10], buf[10:]), nil
 }
