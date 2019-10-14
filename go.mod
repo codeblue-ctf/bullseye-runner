@@ -15,6 +15,9 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/libcompose v0.4.1-0.20190808084053-143e0f3f1ab9
+	github.com/go-playground/locales v0.12.1 // indirect
+	github.com/go-playground/universal-translator v0.16.0 // indirect
+	github.com/go-playground/validator v9.30.0+incompatible
 	github.com/gogo/protobuf v1.3.0 // indirect
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1 // indirect
@@ -26,6 +29,7 @@ require (
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/echo/v4 v4.1.10
+	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lib/pq v1.2.0 // indirect
 	github.com/lucasjones/reggen v0.0.0-20180717132126-cdb49ff09d77
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
