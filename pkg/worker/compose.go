@@ -70,7 +70,7 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	defer CleanFlags(req.Uuid)
 
 	var yml bytes.Buffer
-	tpl, err := template.New("yml").Parse(req.DockerComposeYml)
+	tpl, err := template.New("yml").Parse(req.Yml)
 	if err != nil {
 		return false, "", err
 	}
