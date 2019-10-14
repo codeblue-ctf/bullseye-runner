@@ -15,13 +15,21 @@ type ConnPool struct {
 	connections map[string]*grpc.ClientConn
 }
 
-func (c *ConnPool) AddHost(host string) error {
+func (c *ConnPool) HasHost(host string) bool {
 	pmut.Lock()
 	defer pmut.Unlock()
 
-	if _, ok := c.connections[host]; ok {
+	_, ok := c.connections[host]
+	return ok
+}
+
+func (c *ConnPool) AddHost(host string) error {
+	if c.HasHost(host) == true {
 		return nil
 	}
+
+	pmut.Lock()
+	defer pmut.Unlock()
 
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
