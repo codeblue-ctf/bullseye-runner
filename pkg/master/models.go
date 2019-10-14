@@ -52,7 +52,7 @@ type WorkerResult struct {
 
 type DockerHash struct {
 	gorm.Model
-	Id         string    `json:"id"`
+	Uuid       string    `json:"uuid"`
 	Timestamp  time.Time `json:"timestamp"`
 	Digest     string    `json:"digest"`
 	TeamID     string    `json:"team_id"`

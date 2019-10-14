@@ -17,6 +17,7 @@ func initDB(db *gorm.DB) {
 		&master.Schedule{},
 		&master.Round{},
 		&master.Result{},
+		&master.DockerHash{},
 	)
 }
 
@@ -29,6 +30,8 @@ func main() {
 	}
 	initDB(db)
 
+	go master.RunScheduler(db)
+
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
@@ -36,6 +39,8 @@ func main() {
 	e.GET("/", handler.Index)
 	e.GET("/schedule", handler.GetSchedule(db))
 	e.POST("/schedule", handler.PostSchedule(db))
+
+	e.GET("/dockerhash", handler.DockerHash(db))
 
 	// notification endpoint for docker-registry
 	e.Any("/notification", handler.Notification(db))

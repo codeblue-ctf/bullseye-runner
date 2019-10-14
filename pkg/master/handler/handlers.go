@@ -2,9 +2,9 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -28,6 +28,14 @@ func PostSchedule(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
+func DockerHash(db *gorm.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		records := []models.DockerHash{}
+		db.Find(&records)
+		return c.JSON(http.StatusOK, records)
+	}
+}
+
 type Events struct {
 	Events []struct {
 		Id        string    `json:"id"`
@@ -46,12 +54,6 @@ type Events struct {
 	} `json:"events"`
 }
 
-func DockerHash(db *gorm.DB) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		return c.String(http.StatusOK, "ok")
-	}
-}
-
 func Notification(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		body, err := ioutil.ReadAll(c.Request().Body)
@@ -62,18 +64,26 @@ func Notification(db *gorm.DB) echo.HandlerFunc {
 		if err := json.Unmarshal(body, data); err != nil {
 			return err
 		}
-		fmt.Printf("%+s\n", body)
-		fmt.Printf("%+v\n", data)
-
 		for _, event := range data.Events {
 			if event.Action != "push" {
 				continue
 			}
 
+			if event.Target.MediaType != "application/vnd.docker.distribution.manifest.v2+json" {
+				continue
+			}
+
 			var teamID, problemID string
+			if strings.Contains(event.Target.Repository, "/") {
+				sep := strings.Split(event.Target.Repository, "/")
+				teamID = sep[0]
+				problemID = sep[1]
+			} else {
+				problemID = event.Target.Repository
+			}
 
 			record := &models.DockerHash{
-				Id:         event.Id,
+				Uuid:       event.Id,
 				Timestamp:  event.Timestamp,
 				Digest:     event.Target.Digest,
 				TeamID:     teamID,
