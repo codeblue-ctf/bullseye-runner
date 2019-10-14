@@ -2,8 +2,13 @@ package master
 
 import (
 	"fmt"
+	"sync"
 
 	"google.golang.org/grpc"
+)
+
+var (
+	pmut sync.Mutex
 )
 
 type ConnPool struct {
@@ -11,6 +16,9 @@ type ConnPool struct {
 }
 
 func (c *ConnPool) AddHost(host string) error {
+	pmut.Lock()
+	defer pmut.Unlock()
+
 	if _, ok := c.connections[host]; ok {
 		return nil
 	}
@@ -27,6 +35,9 @@ func (c *ConnPool) AddHost(host string) error {
 }
 
 func (c *ConnPool) GetConn(host string) (*grpc.ClientConn, error) {
+	pmut.Lock()
+	defer pmut.Unlock()
+
 	conn, ok := c.connections[host]
 
 	if !ok {
