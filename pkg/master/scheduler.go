@@ -18,14 +18,16 @@ var (
 )
 
 func RunScheduler(db *gorm.DB) {
-	pool := &ConnPool{}
+	pool := NewConnPool()
+	processes = make(map[string]context.CancelFunc)
+
 	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			err := doSchedule(db, pool)
+			err := doSchedule(db, &pool)
 			if err != nil {
 				log.Printf("schedule error: %v", err)
 			}
@@ -82,43 +84,59 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 	log.Printf("checking rounds")
 
 	// find past unexecuted round
-	db.Select(rounds).Where("start_at <= ?", time.Now())
+	db.Where("start_at <= ?", time.Now()).Find(&rounds)
 
 	for _, round := range rounds {
 		// get latest hash
 		record := &DockerHash{}
 		db.Where("team_id == ? and problem_id == ?", round.TeamID, round.ProblemID).Order("timestamp").First(record)
-		if record == nil {
+		Debug(db.Where("team_id == ? and problem_id == ?", round.TeamID, round.ProblemID).Order("timestamp").First(record).QueryExpr())
+
+		if record != nil {
 			continue
 		}
 
+		log.Printf("found: %s\n", record.Digest)
 		yml, err := EscapedTemplate(round.Yml, map[string]string{
-			"containerHash": record.Digest,
+			"exploitHash": record.Digest,
 		})
 		if err != nil {
 			return err
 		}
 
-		for i := 0; i < int(round.Ntrials); i++ {
-			workerHosts := strings.Split(round.WorkerHosts, ",")
-			workerhost := workerHosts[i%len(workerHosts)]
+		found := []Result{}
+		db.Where("round_refer == ?", round.ID).Find(&found)
 
+		if len(found) > 0 {
+			continue
+		}
+
+		log.Printf("scheduling round: %d\n", round.ID)
+
+		result := Result{
+			Round: round,
+		}
+		db.Create(&result)
+
+		workerHosts := strings.Split(round.WorkerHosts, ",")
+		for i := 0; i < int(round.Ntrials); i++ {
+			workerhost := workerHosts[i%len(workerHosts)]
+			if pool.HasHost(workerhost) != true {
+				if err := pool.AddHost(workerhost); err != nil {
+					return err
+				}
+			}
 			pbcli, err := pool.GetConn(workerhost)
 			if err != nil {
 				return err
 			}
-
-			result := Result{
-				Round: round,
-			}
-			db.Create(result)
 
 			uuid, err := NewUUID()
 			if err != nil {
 				return err
 			}
 
-			req := &pb.RunnerRequest{
+			req := pb.RunnerRequest{
 				Uuid:          uuid,
 				Timeout:       uint64(round.Timeout),
 				Yml:           yml,
@@ -131,9 +149,12 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 				log.Printf("worker %s is ongoing", uuid)
 				continue
 			}
-			processes[uuid] = cancel
 
-			go func(ctx context.Context) {
+			mutex.Lock()
+			processes[uuid] = cancel
+			mutex.Unlock()
+
+			go func(ctx context.Context, req *pb.RunnerRequest) {
 				defer func() { // cleanup
 					mutex.Lock()
 					if _, ok := processes[uuid]; ok == true {
@@ -141,18 +162,20 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 					}
 					mutex.Unlock()
 				}()
+
 				res, err := SendRequest(pb.NewRunnerClient(pbcli), req, ctx)
 				if err != nil {
 					log.Printf("%v.Run(_) = _, %+v", err)
 				}
+
 				workerResult := WorkerResult{
 					Uuid:      uuid,
 					Succeeded: res.Succeeded,
 					Output:    res.Output,
 					Result:    result,
 				}
-				db.Create(workerResult)
-			}(ctx)
+				db.Create(&workerResult)
+			}(ctx, &req)
 		}
 	}
 
@@ -160,15 +183,11 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 }
 
 func SendRequest(client pb.RunnerClient, req *pb.RunnerRequest, ctx context.Context) (*pb.RunnerResponse, error) {
-	// TODO: replace mock
-	log.Printf("%+v", req)
-	return nil, nil
-
 	res, err := client.Run(ctx, req)
 	if err != nil {
 		log.Fatalf("%v.Run(_) = _, %v", client, err)
 	}
 	log.Printf("%+v", res)
 
-	return nil, nil
+	return res, nil
 }

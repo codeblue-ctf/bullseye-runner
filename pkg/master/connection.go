@@ -8,16 +8,22 @@ import (
 )
 
 var (
-	pmut sync.Mutex
+	cpmut sync.Mutex
 )
 
 type ConnPool struct {
 	connections map[string]*grpc.ClientConn
 }
 
+func NewConnPool() ConnPool {
+	pool := ConnPool{}
+	pool.connections = make(map[string]*grpc.ClientConn)
+	return pool
+}
+
 func (c *ConnPool) HasHost(host string) bool {
-	pmut.Lock()
-	defer pmut.Unlock()
+	cpmut.Lock()
+	defer cpmut.Unlock()
 
 	_, ok := c.connections[host]
 	return ok
@@ -28,9 +34,6 @@ func (c *ConnPool) AddHost(host string) error {
 		return nil
 	}
 
-	pmut.Lock()
-	defer pmut.Unlock()
-
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
 	conn, err := grpc.Dial(host, opts...)
@@ -38,13 +41,16 @@ func (c *ConnPool) AddHost(host string) error {
 		return err
 	}
 
+	cpmut.Lock()
+	defer cpmut.Unlock()
+
 	c.connections[host] = conn
 	return nil
 }
 
 func (c *ConnPool) GetConn(host string) (*grpc.ClientConn, error) {
-	pmut.Lock()
-	defer pmut.Unlock()
+	cpmut.Lock()
+	defer cpmut.Unlock()
 
 	conn, ok := c.connections[host]
 
