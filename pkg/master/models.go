@@ -7,6 +7,7 @@ import (
 )
 
 type Schedule struct {
+	gorm.Model
 	StartAt      time.Time `json:"start_at"`
 	StopAt       time.Time `json:"stop_at"`
 	Yml          string    `json:"yml"`
@@ -18,20 +19,21 @@ type Schedule struct {
 	CallbackURL  string    `json:"callback_url"`
 	ProblemID    string    `json:"problem_id"`
 	TeamID       string    `json:"team_id"`
-	Enabled      bool      `json:"enabled"`
 }
 
 type Round struct {
 	gorm.Model
-	StartAt      time.Time `json:"start_at"`
-	Yml          string    `json:"yml"`
-	FlagTemplate string    `json:"flag_template"`
-	Ntrials      uint      `json:"ntrials"`
-	Timeout      uint      `json:"timeout"`
-	WorkerHosts  string    `json:"worker_hosts"`
-	CallbackURL  string    `json:"callback_url"`
-	ProblemID    string    `json:"problem_id"`
-	TeamID       string    `json:"team_id"`
+	StartAt       time.Time `json:"start_at"`
+	Yml           string    `json:"yml"`
+	FlagTemplate  string    `json:"flag_template"`
+	Ntrials       uint      `json:"ntrials"`
+	Timeout       uint      `json:"timeout"`
+	WorkerHosts   string    `json:"worker_hosts"`
+	CallbackURL   string    `json:"callback_url"`
+	ProblemID     string    `json:"problem_id"`
+	TeamID        string    `json:"team_id"`
+	Schedule      Schedule  `gorm:"foreignkey:ScheduleRefer"`
+	ScheduleRefer uint
 }
 
 type Result struct {
