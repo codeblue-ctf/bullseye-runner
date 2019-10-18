@@ -124,7 +124,7 @@ func DeleteResult(db *gorm.DB) echo.HandlerFunc {
 			return c.JSON(http.StatusNotFound, "result not found")
 		}
 		db.Delete(&result)
-		return nil
+		return c.JSON(http.StatusOK, result)
 	}
 }
 
@@ -144,6 +144,20 @@ func GetJob(db *gorm.DB) echo.HandlerFunc {
 		if hit == 0 {
 			return c.JSON(http.StatusNotFound, "job not found")
 		}
+		return c.JSON(http.StatusOK, job)
+	}
+}
+
+func DeleteJob(db *gorm.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		id := c.Param("id")
+		job := models.Job{}
+		hit := 0
+		db.Where("id = ?", id).Find(&job).Count(&hit)
+		if hit == 0 {
+			return c.JSON(http.StatusNotFound, "job not found")
+		}
+		db.Delete(&job)
 		return c.JSON(http.StatusOK, job)
 	}
 }

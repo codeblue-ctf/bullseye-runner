@@ -42,7 +42,7 @@ type Result struct {
 	gorm.Model
 	Succeeded uint  `json:"succeeded"`
 	RoundID   uint  `json:"round_id"`
-	Jobs      []Job `json:"jobs"`
+	Jobs      []Job `json:"jobs,omitempty"`
 }
 
 type Job struct {
@@ -95,5 +95,9 @@ func (s *Schedule) BeforeDelete(db *gorm.DB) error {
 
 func (r *Result) BeforeDelete(db *gorm.DB) error {
 	log.Printf("deleting result")
+	return nil
+}
+
+func (j *Job) BeforeDelete(db *gorm.DB) error {
 	return nil
 }

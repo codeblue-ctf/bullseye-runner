@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -14,12 +15,57 @@ import (
 )
 
 var (
-	pmut      sync.Mutex
-	processes map[string]context.CancelFunc
+	masterCtx     context.Context
+	cancelManager *CancelManager
 )
 
+type CancelManager struct {
+	mut sync.Mutex
+	c   map[string]context.CancelFunc
+}
+
+func NewCancelManager() *CancelManager {
+	return &CancelManager{
+		c: make(map[string]context.CancelFunc),
+	}
+}
+
+func (cm *CancelManager) Has(key string) bool {
+	cm.mut.Lock()
+	defer cm.mut.Unlock()
+	_, ok := cm.c[key]
+	return ok
+}
+
+func (cm *CancelManager) Add(key string, _ctx context.Context) (context.Context, error) {
+	cm.mut.Lock()
+	defer cm.mut.Unlock()
+	if _, ok := cm.c[key]; ok {
+		return nil, fmt.Errorf("key %s already exists", key)
+	}
+
+	ctx, cancel := context.WithCancel(_ctx)
+	cm.c[key] = cancel
+	return ctx, nil
+}
+
+func (cm *CancelManager) Cancel(key string) error {
+	cm.mut.Lock()
+	defer cm.mut.Unlock()
+	cancel, ok := cm.c[key]
+	if !ok {
+		return fmt.Errorf("key %s does not exist", key)
+	}
+	cancel()
+	delete(cm.c, key)
+	return nil
+}
+
 func RunScheduler(db *gorm.DB) {
-	processes = make(map[string]context.CancelFunc)
+	// initialize
+	masterCtx = context.Background()
+	cancelManager = NewCancelManager()
+	rand.Seed(time.Now().UnixNano())
 
 	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
@@ -136,19 +182,18 @@ func doRound(db *gorm.DB, round Round, image Image) error {
 	result := Result{}
 	db.Model(&round).Association("Results").Append(&result)
 
+	ctx, err := cancelManager.Add(fmt.Sprintf("%d"), masterCtx)
+
 	workerHosts := strings.Split(round.WorkerHosts, ",")
 	for i := 0; i < int(round.Ntrials); i++ {
 		workerhost := workerHosts[i%len(workerHosts)]
 
-		uuid, err := NewUUID()
-		for _, ok := processes[uuid]; ok == true; uuid, _ = NewUUID() {
+		uuid := NewUUID()
+		// avoid conflication
+		for ok := cancelManager.Has(uuid); ok; uuid = NewUUID() {
 		}
 
-		if err != nil {
-			return err
-		}
-
-		req := pb.RunnerRequest{
+		req := &pb.RunnerRequest{
 			Uuid:          uuid,
 			Timeout:       uint64(round.Timeout),
 			Yml:           yml,
@@ -156,45 +201,32 @@ func doRound(db *gorm.DB, round Round, image Image) error {
 			FlagTemplate:  round.FlagTemplate,
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-		if _, ok := processes[uuid]; ok == true {
-			log.Printf("worker %s is ongoing", uuid)
-			continue
-		}
+		_ctx, _ := cancelManager.Add(uuid, ctx) // uuid was checked beforehand
 
-		pmut.Lock()
-		processes[uuid] = cancel
-		pmut.Unlock()
-
-		go func(ctx context.Context, host string, req *pb.RunnerRequest, result *Result) error {
-			defer func() { // delete process
-				pmut.Lock()
-				if _, ok := processes[uuid]; ok == true {
-					delete(processes, uuid)
-				}
-				pmut.Unlock()
-			}()
+		go func() {
+			defer cancelManager.Cancel(uuid)
 
 			grpcCli, err := CreateGrpcCli(workerhost)
+			defer grpcCli.Close()
 			if err != nil {
-				return err
+				log.Printf("failed to create grpc connection: %+v", err)
+				return
 			}
 
-			res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, ctx)
+			res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, _ctx)
 			if err != nil {
-				log.Printf("%v.Run(_) = _, %+v", err)
+				log.Printf("error in SendRequest: %+v", err)
+				return
 			}
-			grpcCli.Close()
 
 			job := Job{
-				UUID:      uuid,
+				UUID:      req.Uuid,
 				Succeeded: res.Succeeded,
 				Output:    res.Output,
 			}
-			db.Model(&result).Association("Jobs").Append(&job)
 
-			return nil
-		}(ctx, workerhost, &req, &result)
+			db.Model(&result).Association("Jobs").Append(&job)
+		}()
 	}
 
 	return nil
