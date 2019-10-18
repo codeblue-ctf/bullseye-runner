@@ -81,49 +81,6 @@ func RunScheduler(db *gorm.DB) {
 	}
 }
 
-// func cacheSchedule(db *gorm.DB) error {
-// 	var schedules []Schedule
-// 	db.Find(&schedules)
-
-// 	processes = nil
-// 	for _, sched := range schedules {
-// 		now := time.Now()
-// 		if !sched.Enabled {
-// 			continue
-// 		}
-// 		if sched.StartAt.Before(now) || sched.StopAt.After(now) {
-// 			continue
-// 		}
-// 		var count uint
-// 		db.Where(Result{Schedule: sched}).Count(&count)
-// 		if count == 0 {
-// 			timer := time.NewTimer(time.Second * 10)
-// 			defer timer.Stop()
-// 			ctx, cancel := context.WithCancel(context.Background())
-
-// 			go func() {
-// 				for {
-// 					select {
-// 					case <-timer.C:
-// 						log.Printf("executing sched: %+v", sched)
-// 					case <-ctx.Done(): // canceled
-// 						log.Printf("canceled schedule: %+v", sched)
-// 						return
-// 					}
-
-// 				}
-// 			}()
-// 			process := Process{
-// 				sched,
-// 				cancel,
-// 			}
-// 			processes = append(processes, process)
-// 		}
-// 	}
-
-// 	return nil
-// }
-
 func doSchedule(db *gorm.DB) error {
 	var rounds []Round
 
