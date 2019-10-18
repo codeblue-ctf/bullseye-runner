@@ -2,6 +2,7 @@ package master
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 	"sync"
@@ -13,7 +14,7 @@ import (
 )
 
 var (
-	mutex     sync.Mutex
+	pmut      sync.Mutex
 	processes map[string]context.CancelFunc
 )
 
@@ -83,17 +84,22 @@ func doSchedule(db *gorm.DB) error {
 	log.Printf("checking rounds")
 
 	// find past unexecuted round
-	db.Where("start_at <= ?", time.Now()).Find(&rounds)
+	db.Preload("Results").Where("start_at <= ?", time.Now()).Find(&rounds)
 
 	for _, round := range rounds {
 		// skip if already executed
-		results := []Result{}
-		db.Model(&round).Related(&results)
-		if len(results) > 0 {
+		if len(round.Results) > 0 {
 			continue
 		}
 
-		if err := doRound(db, round); err != nil {
+		// get latest hash
+		image, err := findImage(db, round)
+		if err != nil {
+			continue
+		}
+		log.Printf("found: %s\n", image.Digest)
+
+		if err := doRound(db, round, *image); err != nil {
 			log.Printf("%+v", err)
 		}
 	}
@@ -101,19 +107,25 @@ func doSchedule(db *gorm.DB) error {
 	return nil
 }
 
-func doRound(db *gorm.DB, round Round) error {
-	// get latest hash
-	record := DockerHash{}
+func findImage(db *gorm.DB, round Round) (*Image, error) {
+	image := Image{}
 	hit := 0
-	db.Where("team_id = ? and problem_id = ?", round.TeamID, round.ProblemID).Where("timestamp <= ?", round.StartAt).Order("timestamp").First(&record).Count(&hit)
-	Debug(db.Where("team_id = ? and problem_id = ?", round.TeamID, round.ProblemID).Where("timestamp <= ?", round.StartAt).Order("timestamp").First(&record).Count(&hit).QueryExpr())
+
+	db.Where("team_id = ? and problem_id = ?", round.TeamID, round.ProblemID).
+		Where("created_at <= ?", round.StartAt).
+		Order("created_at").
+		First(&image).Count(&hit)
+
 	if hit == 0 {
-		return nil
+		return nil, fmt.Errorf("Image not found")
 	}
 
-	log.Printf("found: %s\n", record.Digest)
+	return &image, nil
+}
+
+func doRound(db *gorm.DB, round Round, image Image) error {
 	yml, err := EscapedTemplate(round.Yml, map[string]string{
-		"exploitHash": record.Digest,
+		"exploitHash": image.Digest,
 	})
 	if err != nil {
 		return err
@@ -129,7 +141,7 @@ func doRound(db *gorm.DB, round Round) error {
 		workerhost := workerHosts[i%len(workerHosts)]
 
 		uuid, err := NewUUID()
-		for _, ok := processes[uuid]; ok != true; uuid, _ = NewUUID() {
+		for _, ok := processes[uuid]; ok == true; uuid, _ = NewUUID() {
 		}
 
 		if err != nil {
@@ -150,17 +162,17 @@ func doRound(db *gorm.DB, round Round) error {
 			continue
 		}
 
-		mutex.Lock()
+		pmut.Lock()
 		processes[uuid] = cancel
-		mutex.Unlock()
+		pmut.Unlock()
 
 		go func(ctx context.Context, host string, req *pb.RunnerRequest, result *Result) error {
-			defer func() { // cleanup
-				mutex.Lock()
+			defer func() { // delete process
+				pmut.Lock()
 				if _, ok := processes[uuid]; ok == true {
 					delete(processes, uuid)
 				}
-				mutex.Unlock()
+				pmut.Unlock()
 			}()
 
 			grpcCli, err := CreateGrpcCli(workerhost)

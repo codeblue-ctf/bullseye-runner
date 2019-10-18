@@ -18,7 +18,7 @@ func initDB(db *gorm.DB) {
 		&master.Round{},
 		&master.Result{},
 		&master.Job{},
-		&master.DockerHash{},
+		&master.Image{},
 	)
 }
 
@@ -49,11 +49,12 @@ func main() {
 
 	e.GET("/result", handler.GetResult(db))
 	e.GET("/result/:id", handler.GetResult(db))
+	e.DELETE("/result/:id", handler.DeleteResult(db))
 
 	e.GET("/job", handler.GetJob(db))
 	e.GET("/job/:id", handler.GetJob(db))
 
-	e.GET("/dockerhash", handler.DockerHash(db))
+	e.GET("/image", handler.Image(db))
 
 	// notification endpoint for docker-registry
 	e.Any("/notification", handler.Notification(db))

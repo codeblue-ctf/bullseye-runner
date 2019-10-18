@@ -1,6 +1,7 @@
 package master
 
 import (
+	"log"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -53,15 +54,14 @@ type Job struct {
 	ResultID  uint   `json:"result_id"`
 }
 
-type DockerHash struct {
+type Image struct {
 	gorm.Model
-	UUID       string    `json:"uuid"`
-	Timestamp  time.Time `json:"timestamp"`
-	Digest     string    `json:"digest"`
-	TeamID     string    `json:"team_id"`
-	ProblemID  string    `json:"problem_id"`
-	RemoteAddr string    `json:"remote_addr"`
-	UserAgent  string    `json:"user_agent"`
+	UUID       string `json:"uuid"`
+	Digest     string `json:"digest"`
+	TeamID     string `json:"team_id"`
+	ProblemID  string `json:"problem_id"`
+	RemoteAddr string `json:"remote_addr"`
+	UserAgent  string `json:"user_agent"`
 }
 
 func (s *Schedule) AfterCreate(db *gorm.DB) error {
@@ -90,5 +90,10 @@ func (s *Schedule) BeforeDelete(db *gorm.DB) error {
 	rounds := []Round{}
 	db.Model(s).Association("Rounds").Find(&rounds)
 	db.Delete(&rounds)
+	return nil
+}
+
+func (r *Result) BeforeDelete(db *gorm.DB) error {
+	log.Printf("deleting result")
 	return nil
 }

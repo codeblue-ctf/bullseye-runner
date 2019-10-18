@@ -13,6 +13,14 @@ import (
 	models "gitlab.com/CBCTF/bullseye-runner/pkg/master"
 )
 
+type Timestamp time.Time
+
+func (t *Timestamp) UnmarshalParam(src string) error {
+	ts, err := time.Parse(time.RFC3339, src)
+	*t = Timestamp(ts)
+	return err
+}
+
 func Index(c echo.Context) error {
 	return c.String(http.StatusOK, "test")
 }
@@ -105,6 +113,21 @@ func GetResult(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
+// DeleteRound cancel running jobs
+func DeleteResult(db *gorm.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		id := c.Param("id")
+		result := models.Result{}
+		hit := 0
+		db.Where("id = ?", id).Find(&result).Count(&hit)
+		if hit == 0 {
+			return c.JSON(http.StatusNotFound, "result not found")
+		}
+		db.Delete(&result)
+		return nil
+	}
+}
+
 func GetJob(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.Param("id")
@@ -125,9 +148,9 @@ func GetJob(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
-func DockerHash(db *gorm.DB) echo.HandlerFunc {
+func Image(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		records := []models.DockerHash{}
+		records := []models.Image{}
 		db.Find(&records)
 		return c.JSON(http.StatusOK, records)
 	}
@@ -179,16 +202,15 @@ func Notification(db *gorm.DB) echo.HandlerFunc {
 				problemID = event.Target.Repository
 			}
 
-			record := models.DockerHash{
+			image := models.Image{
 				UUID:       event.Id,
-				Timestamp:  event.Timestamp,
 				Digest:     event.Target.Digest,
 				TeamID:     teamID,
 				ProblemID:  problemID,
 				RemoteAddr: event.Request.Addr,
 				UserAgent:  event.Request.Useragent,
 			}
-			db.Create(&record)
+			db.Create(&image)
 		}
 		return c.String(http.StatusOK, "ok")
 	}
