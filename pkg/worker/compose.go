@@ -115,12 +115,12 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 		return false, "", err
 	}
 
+	defer cleanCompose(req, project)
 	err = project.Up(ctx, options.Up{})
 	if err != nil {
 		log.Printf("failed to up: %v", err)
 		return false, "", err
 	}
-	defer cleanCompose(req, project)
 
 	time.Sleep(time.Duration(req.Timeout) * time.Millisecond)
 
