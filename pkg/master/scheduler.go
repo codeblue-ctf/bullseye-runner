@@ -10,6 +10,7 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -18,7 +19,6 @@ var (
 )
 
 func RunScheduler(db *gorm.DB) {
-	pool := NewConnPool()
 	processes = make(map[string]context.CancelFunc)
 
 	ticker := time.NewTicker(time.Second * 5)
@@ -27,7 +27,7 @@ func RunScheduler(db *gorm.DB) {
 	for {
 		select {
 		case <-ticker.C:
-			err := doSchedule(db, &pool)
+			err := doSchedule(db)
 			if err != nil {
 				log.Printf("schedule error: %v", err)
 			}
@@ -78,7 +78,7 @@ func RunScheduler(db *gorm.DB) {
 // 	return nil
 // }
 
-func doSchedule(db *gorm.DB, pool *ConnPool) error {
+func doSchedule(db *gorm.DB) error {
 	var rounds []Round
 
 	log.Printf("checking rounds")
@@ -87,12 +87,18 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 	db.Where("start_at <= ?", time.Now()).Find(&rounds)
 
 	for _, round := range rounds {
-		// get latest hash
-		record := &DockerHash{}
-		db.Where("team_id == ? and problem_id == ?", round.TeamID, round.ProblemID).Order("timestamp").First(record)
-		Debug(db.Where("team_id == ? and problem_id == ?", round.TeamID, round.ProblemID).Order("timestamp").First(record).QueryExpr())
+		// skip if already executed
+		results := []Result{}
+		db.Model(&round).Related(&results)
+		if len(results) > 0 {
+			continue
+		}
 
-		if record != nil {
+		// get latest hash
+		record := DockerHash{}
+		hit := 0
+		db.Where("team_id == ? and problem_id == ?", round.TeamID, round.ProblemID).Order("timestamp").First(&record).Count(&hit)
+		if hit == 0 {
 			continue
 		}
 
@@ -104,29 +110,15 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 			return err
 		}
 
-		found := []Result{}
-		db.Where("round_refer == ?", round.ID).Find(&found)
-
-		if len(found) > 0 {
-			continue
-		}
-
 		log.Printf("scheduling round: %d\n", round.ID)
 
-		result := Result{
-			Round: round,
-		}
-		db.Create(&result)
+		result := Result{}
+		db.Model(&round).Association("Results").Append(&result)
 
 		workerHosts := strings.Split(round.WorkerHosts, ",")
 		for i := 0; i < int(round.Ntrials); i++ {
 			workerhost := workerHosts[i%len(workerHosts)]
-			if pool.HasHost(workerhost) != true {
-				if err := pool.AddHost(workerhost); err != nil {
-					return err
-				}
-			}
-			pbcli, err := pool.GetConn(workerhost)
+			grpcCli, err := CreateGrpcCli(workerhost)
 			if err != nil {
 				return err
 			}
@@ -154,7 +146,7 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 			processes[uuid] = cancel
 			mutex.Unlock()
 
-			go func(ctx context.Context, req *pb.RunnerRequest) {
+			go func(ctx context.Context, grpcCli *grpc.ClientConn, req *pb.RunnerRequest, result *Result) {
 				defer func() { // cleanup
 					mutex.Lock()
 					if _, ok := processes[uuid]; ok == true {
@@ -163,19 +155,19 @@ func doSchedule(db *gorm.DB, pool *ConnPool) error {
 					mutex.Unlock()
 				}()
 
-				res, err := SendRequest(pb.NewRunnerClient(pbcli), req, ctx)
+				res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, ctx)
 				if err != nil {
 					log.Printf("%v.Run(_) = _, %+v", err)
 				}
+				grpcCli.Close()
 
 				workerResult := WorkerResult{
 					Uuid:      uuid,
 					Succeeded: res.Succeeded,
 					Output:    res.Output,
-					Result:    result,
 				}
-				db.Create(&workerResult)
-			}(ctx, &req)
+				db.Model(&result).Association("WorkerResults").Append(&workerResult)
+			}(ctx, grpcCli, &req, &result)
 		}
 	}
 

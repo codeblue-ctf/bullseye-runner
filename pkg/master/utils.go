@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"log"
 	"reflect"
 	"regexp"
 	"text/template"
+
+	"google.golang.org/grpc"
 )
 
 // EscapedTemplate executes template without replacing undefined field
@@ -53,5 +56,16 @@ func NewUUID() (string, error) {
 	if _, err := rand.Read(buf); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%04x-%02x-%02x-%02x-%06x", buf[:4], buf[4:6], buf[6:8], buf[8:10], buf[10:]), nil
+	return fmt.Sprintf("%016x", buf), nil
+	// return fmt.Sprintf("%04x-%02x-%02x-%02x-%06x", buf[:4], buf[4:6], buf[6:8], buf[8:10], buf[10:]), nil
+}
+
+func CreateGrpcCli(host string) (*grpc.ClientConn, error) {
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithInsecure())
+	return grpc.Dial(host, opts...)
+}
+
+func Debug(p interface{}) {
+	log.Printf("%+v", p)
 }
