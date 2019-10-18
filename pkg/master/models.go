@@ -1,7 +1,7 @@
 package master
 
 import (
-	"log"
+	"fmt"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -94,10 +94,14 @@ func (s *Schedule) BeforeDelete(db *gorm.DB) error {
 }
 
 func (r *Result) BeforeDelete(db *gorm.DB) error {
-	log.Printf("deleting result")
+	cancelManager.Cancel(fmt.Sprintf("%d", r.ID))
+	jobs := []Job{}
+	db.Model(r).Association("Jobs").Find(&jobs)
+	db.Delete(&jobs)
 	return nil
 }
 
 func (j *Job) BeforeDelete(db *gorm.DB) error {
+	cancelManager.Cancel(j.UUID)
 	return nil
 }
