@@ -45,6 +45,7 @@ func main() {
 	e.DELETE("/schedule/:id", handler.DeleteSchedule(db))
 
 	e.GET("/round", handler.GetRound(db))
+	e.POST("/round", handler.PostRound(db))
 	e.GET("/round/:id", handler.GetRound(db))
 
 	e.GET("/result", handler.GetResult(db))
@@ -55,10 +56,9 @@ func main() {
 	e.GET("/job/:id", handler.GetJob(db))
 	e.DELETE("/job/:id", handler.DeleteJob(db))
 
-	e.GET("/image", handler.Image(db))
+	e.GET("/running", handler.ListRunning)
 
-	// notification endpoint for docker-registry
-	e.Any("/notification", handler.Notification(db))
+	e.GET("/image", handler.Image(db))
 
 	e.Logger.Fatal(e.Start(":8080"))
 }

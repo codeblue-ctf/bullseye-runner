@@ -1,25 +1,13 @@
 package handler
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/labstack/echo/v4"
 
-	models "gitlab.com/CBCTF/bullseye-runner/pkg/master"
+	master "gitlab.com/CBCTF/bullseye-runner/pkg/master"
 )
-
-type Timestamp time.Time
-
-func (t *Timestamp) UnmarshalParam(src string) error {
-	ts, err := time.Parse(time.RFC3339, src)
-	*t = Timestamp(ts)
-	return err
-}
 
 func Index(c echo.Context) error {
 	return c.String(http.StatusOK, "test")
@@ -31,13 +19,13 @@ func GetSchedule(db *gorm.DB) echo.HandlerFunc {
 		id := c.Param("id")
 		if id == "" {
 			// return all schedules
-			schedules := []models.Schedule{}
+			schedules := []master.Schedule{}
 			db.Find(&schedules)
 			return c.JSON(http.StatusOK, schedules)
 		}
 
 		// return specific schedule
-		schedule := models.Schedule{}
+		schedule := master.Schedule{}
 		hit := 0
 		db.Preload("Rounds").Where("id = ?", id).Find(&schedule).Count(&hit)
 		if hit == 0 {
@@ -50,7 +38,7 @@ func GetSchedule(db *gorm.DB) echo.HandlerFunc {
 // PostSchedule creates new schedule
 func PostSchedule(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		schedule := models.Schedule{}
+		schedule := master.Schedule{}
 		if err := c.Bind(&schedule); err != nil {
 			return err
 		}
@@ -62,7 +50,7 @@ func PostSchedule(db *gorm.DB) echo.HandlerFunc {
 func DeleteSchedule(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.Param("id")
-		schedule := models.Schedule{}
+		schedule := master.Schedule{}
 		hit := 0
 		db.Where("id = ?", id).Find(&schedule).Count(&hit)
 		if hit == 0 {
@@ -78,12 +66,12 @@ func GetRound(db *gorm.DB) echo.HandlerFunc {
 		id := c.Param("id")
 		if id == "" {
 			// return all rounds
-			rounds := []models.Round{}
+			rounds := []master.Round{}
 			db.Find(&rounds)
 			return c.JSON(http.StatusOK, rounds)
 		}
 		// return specific round
-		round := models.Round{}
+		round := master.Round{}
 		hit := 0
 		db.Preload("Results").Where("id = ?", id).Find(&round).Count(&hit)
 		if hit == 0 {
@@ -93,17 +81,29 @@ func GetRound(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
+// PostRound is for re-evaluation by hand
+func PostRound(db *gorm.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		round := master.Round{}
+		if err := c.Bind(&round); err != nil {
+			return err
+		}
+		db.Create(&round)
+		return c.JSON(http.StatusOK, round)
+	}
+}
+
 func GetResult(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.Param("id")
 		if id == "" {
 			// return all results
-			results := []models.Result{}
+			results := []master.Result{}
 			db.Find(&results)
 			return c.JSON(http.StatusOK, results)
 		}
 		// return specific result
-		result := models.Result{}
+		result := master.Result{}
 		hit := 0
 		db.Preload("Jobs").Where("id = ?", id).Find(&result).Count(&hit)
 		if hit == 0 {
@@ -117,7 +117,7 @@ func GetResult(db *gorm.DB) echo.HandlerFunc {
 func DeleteResult(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.Param("id")
-		result := models.Result{}
+		result := master.Result{}
 		hit := 0
 		db.Where("id = ?", id).Find(&result).Count(&hit)
 		if hit == 0 {
@@ -133,12 +133,12 @@ func GetJob(db *gorm.DB) echo.HandlerFunc {
 		id := c.Param("id")
 		if id == "" {
 			// return all jobs
-			jobs := []models.Job{}
+			jobs := []master.Job{}
 			db.Find(&jobs)
 			return c.JSON(http.StatusOK, jobs)
 		}
 		// return specific job
-		job := models.Job{}
+		job := master.Job{}
 		hit := 0
 		db.Where("id = ?", id).Find(&job).Count(&hit)
 		if hit == 0 {
@@ -151,7 +151,7 @@ func GetJob(db *gorm.DB) echo.HandlerFunc {
 func DeleteJob(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.Param("id")
-		job := models.Job{}
+		job := master.Job{}
 		hit := 0
 		db.Where("id = ?", id).Find(&job).Count(&hit)
 		if hit == 0 {
@@ -162,70 +162,14 @@ func DeleteJob(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
+func ListRunning(c echo.Context) error {
+	return c.JSON(http.StatusOK, master.CancelMgr.Keys())
+}
+
 func Image(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		records := []models.Image{}
+		records := []master.Image{}
 		db.Find(&records)
 		return c.JSON(http.StatusOK, records)
-	}
-}
-
-type Events struct {
-	Events []struct {
-		Id        string    `json:"id"`
-		Timestamp time.Time `json:"timestamp"`
-		Action    string    `json:"action"`
-		Target    struct {
-			MediaType  string `json:"mediaType"`
-			Digest     string `json:"digest"`
-			Repository string `json:"repository"`
-			Tag        string `json:"tag"`
-		} `json:"target"`
-		Request struct {
-			Addr      string `json:"addr"`
-			Useragent string `json:"useragent"`
-		} `json:"request"`
-	} `json:"events"`
-}
-
-func Notification(db *gorm.DB) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		body, err := ioutil.ReadAll(c.Request().Body)
-		if err != nil {
-			return err
-		}
-		data := new(Events)
-		if err := json.Unmarshal(body, data); err != nil {
-			return err
-		}
-		for _, event := range data.Events {
-			if event.Action != "push" {
-				continue
-			}
-
-			if event.Target.MediaType != "application/vnd.docker.distribution.manifest.v2+json" {
-				continue
-			}
-
-			var teamID, problemID string
-			if strings.Contains(event.Target.Repository, "/") {
-				sep := strings.Split(event.Target.Repository, "/")
-				teamID = sep[0]
-				problemID = sep[1]
-			} else {
-				problemID = event.Target.Repository
-			}
-
-			image := models.Image{
-				UUID:       event.Id,
-				Digest:     event.Target.Digest,
-				TeamID:     teamID,
-				ProblemID:  problemID,
-				RemoteAddr: event.Request.Addr,
-				UserAgent:  event.Request.Useragent,
-			}
-			db.Create(&image)
-		}
-		return c.String(http.StatusOK, "ok")
 	}
 }

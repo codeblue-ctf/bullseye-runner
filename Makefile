@@ -5,7 +5,7 @@ BUILD := $(shell git rev-parse --short HEAD)
 LDFLAGS = -ldflags "-X=main.Build=$(BUILD)"
 
 .PHONY: build
-build: build-master build-worker build-client
+build: build-master build-worker build-notification build-client
 
 .PHONY: build-master
 build-master: build-proto
@@ -14,6 +14,10 @@ build-master: build-proto
 .PHONY: build-worker
 build-worker: build-proto
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/runner-worker $(LDFLAGS) -v ./cmd/worker
+
+.PHONY: build-notification
+build-notification:
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o ./bin/notification $(LDFLAGS) -v ./cmd/notification
 
 .PHONY: build-client
 build-client: build-proto
