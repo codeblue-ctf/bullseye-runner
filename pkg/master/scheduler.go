@@ -170,19 +170,20 @@ func doRound(db *gorm.DB, round Round, image Image) error {
 				return
 			}
 
+			job := Job{
+				UUID: req.Uuid,
+			}
+			db.Model(&result).Association("Jobs").Append(&job)
+
 			res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, _ctx)
 			if err != nil {
 				log.Printf("error in SendRequest: %+v", err)
 				return
 			}
 
-			job := Job{
-				UUID:      req.Uuid,
-				Succeeded: res.Succeeded,
-				Output:    res.Output,
-			}
-
-			db.Model(&result).Association("Jobs").Append(&job)
+			job.Succeeded = res.Succeeded
+			job.Output = res.Output
+			db.Save(&job)
 		}()
 	}
 
