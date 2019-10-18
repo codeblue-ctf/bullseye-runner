@@ -17,7 +17,7 @@ func initDB(db *gorm.DB) {
 		&master.Schedule{},
 		&master.Round{},
 		&master.Result{},
-		&master.WorkerResult{},
+		&master.Job{},
 		&master.DockerHash{},
 	)
 }
@@ -39,15 +39,18 @@ func main() {
 
 	e.GET("/", handler.Index)
 
-	e.GET("/round", handler.GetRounds(db))
-
 	e.GET("/schedule", handler.GetSchedule(db))
 	e.GET("/schedule/:id", handler.GetSchedule(db))
 	e.POST("/schedule", handler.PostSchedule(db))
 	e.DELETE("/schedule/:id", handler.DeleteSchedule(db))
 
-	e.GET("/results", handler.GetResults(db))
-	e.GET("/workerresults", handler.GetWorkerResults(db))
+	e.GET("/round", handler.GetRound(db))
+	e.GET("/round/:id", handler.GetRound(db))
+
+	e.GET("/result", handler.GetResult(db))
+	e.GET("/result/:id", handler.GetResult(db))
+
+	e.GET("/job", handler.GetWorkerResults(db))
 
 	e.GET("/dockerhash", handler.DockerHash(db))
 

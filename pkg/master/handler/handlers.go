@@ -2,9 +2,7 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -19,32 +17,25 @@ func Index(c echo.Context) error {
 	return c.String(http.StatusOK, "test")
 }
 
-func GetRounds(db *gorm.DB) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		rounds := []models.Round{}
-		db.Find(&rounds)
-		return c.JSON(http.StatusOK, rounds)
-	}
-}
-
 // GetSchedule returns all schedules currently registered
 func GetSchedule(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.Param("id")
-		log.Printf("id:%s", id)
 		if id == "" {
+			// return all schedules
 			schedules := []models.Schedule{}
 			db.Find(&schedules)
 			return c.JSON(http.StatusOK, schedules)
-		} else {
-			schedule := models.Schedule{}
-			hit := 0
-			db.Where("id = ?", id).Find(&schedule).Count(&hit)
-			if hit == 0 {
-				return c.JSON(http.StatusNotFound, "schedule not found")
-			}
-			return c.JSON(http.StatusOK, schedule)
 		}
+
+		// return specific schedule
+		schedule := models.Schedule{}
+		hit := 0
+		db.Preload("Rounds").Where("id = ?", id).Find(&schedule).Count(&hit)
+		if hit == 0 {
+			return c.JSON(http.StatusNotFound, "schedule not found")
+		}
+		return c.JSON(http.StatusOK, schedule)
 	}
 }
 
@@ -56,22 +47,6 @@ func PostSchedule(db *gorm.DB) echo.HandlerFunc {
 			return err
 		}
 		db.Create(&schedule)
-		for t := schedule.StartAt; t.Before(schedule.StopAt); t = t.Add(time.Duration(schedule.Interval) * time.Minute) {
-			fmt.Printf("%+v\n", t)
-			round := models.Round{
-				StartAt:      t,
-				Yml:          schedule.Yml,
-				FlagTemplate: schedule.FlagTemplate,
-				Ntrials:      schedule.Ntrials,
-				Timeout:      schedule.Timeout,
-				WorkerHosts:  schedule.WorkerHosts,
-				CallbackURL:  schedule.CallbackURL,
-				ProblemID:    schedule.ProblemID,
-				TeamID:       schedule.TeamID,
-				Schedule:     schedule,
-			}
-			db.Create(&round)
-		}
 		return c.JSON(http.StatusOK, schedule)
 	}
 }
@@ -85,24 +60,56 @@ func DeleteSchedule(db *gorm.DB) echo.HandlerFunc {
 		if hit == 0 {
 			return c.JSON(http.StatusNotFound, "schedule not found")
 		}
-		db.Delete(schedule)
+		db.Delete(&schedule)
 		return c.JSON(http.StatusOK, schedule)
 	}
 }
 
-func GetResults(db *gorm.DB) echo.HandlerFunc {
+func GetRound(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		results := []models.Result{}
-		db.Find(&results)
-		return c.JSON(http.StatusOK, results)
+		id := c.Param("id")
+		if id == "" {
+			// return all rounds
+			rounds := []models.Round{}
+			db.Find(&rounds)
+			return c.JSON(http.StatusOK, rounds)
+		}
+		// return specific round
+		round := models.Round{}
+		hit := 0
+		db.Preload("Results").Where("id = ?", id).Find(&round).Count(&hit)
+		if hit == 0 {
+			return c.JSON(http.StatusNotFound, "round not found")
+		}
+		return c.JSON(http.StatusOK, round)
+	}
+}
+
+func GetResult(db *gorm.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		id := c.Param("id")
+		if id == "" {
+			// return all results
+			results := []models.Result{}
+			db.Find(&results)
+			return c.JSON(http.StatusOK, results)
+		}
+		// return specific result
+		result := models.Result{}
+		hit := 0
+		db.Preload("Jobs").Where("id = ?", id).Find(&result).Count(&hit)
+		if hit == 0 {
+			return c.JSON(http.StatusNotFound, "result not found")
+		}
+		return c.JSON(http.StatusOK, result)
 	}
 }
 
 func GetWorkerResults(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		workerResults := []models.WorkerResult{}
-		db.Find(&workerResults)
-		return c.JSON(http.StatusOK, workerResults)
+		jobs := []models.Job{}
+		db.Find(&jobs)
+		return c.JSON(http.StatusOK, jobs)
 	}
 }
 
@@ -161,7 +168,7 @@ func Notification(db *gorm.DB) echo.HandlerFunc {
 			}
 
 			record := models.DockerHash{
-				Uuid:       event.Id,
+				UUID:       event.Id,
 				Timestamp:  event.Timestamp,
 				Digest:     event.Target.Digest,
 				TeamID:     teamID,

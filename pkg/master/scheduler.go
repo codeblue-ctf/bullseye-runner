@@ -10,7 +10,6 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -94,81 +93,96 @@ func doSchedule(db *gorm.DB) error {
 			continue
 		}
 
-		// get latest hash
-		record := DockerHash{}
-		hit := 0
-		db.Where("team_id == ? and problem_id == ?", round.TeamID, round.ProblemID).Order("timestamp").First(&record).Count(&hit)
-		if hit == 0 {
-			continue
+		if err := doRound(db, round); err != nil {
+			log.Printf("%+v", err)
+		}
+	}
+
+	return nil
+}
+
+func doRound(db *gorm.DB, round Round) error {
+	// get latest hash
+	record := DockerHash{}
+	hit := 0
+	db.Where("team_id = ? and problem_id = ?", round.TeamID, round.ProblemID).Where("timestamp <= ?", round.StartAt).Order("timestamp").First(&record).Count(&hit)
+	Debug(db.Where("team_id = ? and problem_id = ?", round.TeamID, round.ProblemID).Where("timestamp <= ?", round.StartAt).Order("timestamp").First(&record).Count(&hit).QueryExpr())
+	if hit == 0 {
+		return nil
+	}
+
+	log.Printf("found: %s\n", record.Digest)
+	yml, err := EscapedTemplate(round.Yml, map[string]string{
+		"exploitHash": record.Digest,
+	})
+	if err != nil {
+		return err
+	}
+
+	log.Printf("scheduling round: %d\n", round.ID)
+
+	result := Result{}
+	db.Model(&round).Association("Results").Append(&result)
+
+	workerHosts := strings.Split(round.WorkerHosts, ",")
+	for i := 0; i < int(round.Ntrials); i++ {
+		workerhost := workerHosts[i%len(workerHosts)]
+
+		uuid, err := NewUUID()
+		for _, ok := processes[uuid]; ok != true; uuid, _ = NewUUID() {
 		}
 
-		log.Printf("found: %s\n", record.Digest)
-		yml, err := EscapedTemplate(round.Yml, map[string]string{
-			"exploitHash": record.Digest,
-		})
 		if err != nil {
 			return err
 		}
 
-		log.Printf("scheduling round: %d\n", round.ID)
+		req := pb.RunnerRequest{
+			Uuid:          uuid,
+			Timeout:       uint64(round.Timeout),
+			Yml:           yml,
+			RegistryToken: "test",
+			FlagTemplate:  round.FlagTemplate,
+		}
 
-		result := Result{}
-		db.Model(&round).Association("Results").Append(&result)
+		ctx, cancel := context.WithCancel(context.Background())
+		if _, ok := processes[uuid]; ok == true {
+			log.Printf("worker %s is ongoing", uuid)
+			continue
+		}
 
-		workerHosts := strings.Split(round.WorkerHosts, ",")
-		for i := 0; i < int(round.Ntrials); i++ {
-			workerhost := workerHosts[i%len(workerHosts)]
+		mutex.Lock()
+		processes[uuid] = cancel
+		mutex.Unlock()
+
+		go func(ctx context.Context, host string, req *pb.RunnerRequest, result *Result) error {
+			defer func() { // cleanup
+				mutex.Lock()
+				if _, ok := processes[uuid]; ok == true {
+					delete(processes, uuid)
+				}
+				mutex.Unlock()
+			}()
+
 			grpcCli, err := CreateGrpcCli(workerhost)
 			if err != nil {
 				return err
 			}
 
-			uuid, err := NewUUID()
+			res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, ctx)
 			if err != nil {
-				return err
+				log.Printf("%v.Run(_) = _, %+v", err)
 			}
+			grpcCli.Close()
 
-			req := pb.RunnerRequest{
-				Uuid:          uuid,
-				Timeout:       uint64(round.Timeout),
-				Yml:           yml,
-				RegistryToken: "test",
-				FlagTemplate:  round.FlagTemplate,
+			job := Job{
+				UUID:      uuid,
+				Succeeded: res.Succeeded,
+				Output:    res.Output,
 			}
+			db.Model(&result).Association("Jobs").Append(&job)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			if _, ok := processes[uuid]; ok == true {
-				log.Printf("worker %s is ongoing", uuid)
-				continue
-			}
-
-			mutex.Lock()
-			processes[uuid] = cancel
-			mutex.Unlock()
-
-			go func(ctx context.Context, grpcCli *grpc.ClientConn, req *pb.RunnerRequest, result *Result) {
-				defer func() { // cleanup
-					mutex.Lock()
-					if _, ok := processes[uuid]; ok == true {
-						delete(processes, uuid)
-					}
-					mutex.Unlock()
-				}()
-
-				res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, ctx)
-				if err != nil {
-					log.Printf("%v.Run(_) = _, %+v", err)
-				}
-				grpcCli.Close()
-
-				workerResult := WorkerResult{
-					Uuid:      uuid,
-					Succeeded: res.Succeeded,
-					Output:    res.Output,
-				}
-				db.Model(&result).Association("WorkerResults").Append(&workerResult)
-			}(ctx, grpcCli, &req, &result)
-		}
+			return nil
+		}(ctx, workerhost, &req, &result)
 	}
 
 	return nil
