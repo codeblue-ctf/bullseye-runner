@@ -25,17 +25,18 @@ type Schedule struct {
 
 type Round struct {
 	gorm.Model
-	StartAt      time.Time `json:"start_at"`
-	Yml          string    `json:"yml"`
-	FlagTemplate string    `json:"flag_template"`
-	Ntrials      uint      `json:"ntrials"`
-	Timeout      uint      `json:"timeout"`
-	WorkerHosts  string    `json:"worker_hosts"`
-	CallbackURL  string    `json:"callback_url"`
-	ProblemID    string    `json:"problem_id"`
-	TeamID       string    `json:"team_id"`
-	ScheduleID   uint      `json:"schedule_id"`
-	Results      []Result  `json:"-,omitempty"`
+	StartAt      *time.Time `json:"start_at"`
+	Yml          string     `json:"yml"`
+	FlagTemplate string     `json:"flag_template"`
+	Ntrials      uint       `json:"ntrials"`
+	Timeout      uint       `json:"timeout"`
+	WorkerHosts  string     `json:"worker_hosts"`
+	CallbackURL  string     `json:"callback_url"`
+	ProblemID    string     `json:"problem_id"`
+	TeamID       string     `json:"team_id"`
+	ScheduleID   uint       `json:"schedule_id"`
+	ExploitHash  string     `json:"exploit_hash,omitempty"`
+	Results      []Result   `json:"-"`
 }
 
 type Result struct {
@@ -68,8 +69,9 @@ func (s *Schedule) AfterCreate(db *gorm.DB) error {
 	// create rounds according to schedule
 	rounds := []Round{}
 	for t := s.StartAt; t.Before(s.StopAt); t = t.Add(time.Duration(s.Interval) * time.Minute) {
+		_t := t
 		round := Round{
-			StartAt:      t,
+			StartAt:      &_t,
 			Yml:          s.Yml,
 			FlagTemplate: s.FlagTemplate,
 			Ntrials:      s.Ntrials,
@@ -94,7 +96,7 @@ func (s *Schedule) BeforeDelete(db *gorm.DB) error {
 }
 
 func (r *Result) BeforeDelete(db *gorm.DB) error {
-	cancelManager.Cancel(fmt.Sprintf("%d", r.ID))
+	CancelMgr.Cancel(fmt.Sprintf("%d", r.ID))
 	jobs := []Job{}
 	db.Model(r).Association("Jobs").Find(&jobs)
 	db.Delete(&jobs)
@@ -102,6 +104,6 @@ func (r *Result) BeforeDelete(db *gorm.DB) error {
 }
 
 func (j *Job) BeforeDelete(db *gorm.DB) error {
-	cancelManager.Cancel(j.UUID)
+	CancelMgr.Cancel(j.UUID)
 	return nil
 }

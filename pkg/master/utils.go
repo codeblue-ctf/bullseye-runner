@@ -2,11 +2,13 @@ package master
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
 	"reflect"
 	"regexp"
+	"sync"
 	"text/template"
 
 	"google.golang.org/grpc"
@@ -62,6 +64,58 @@ func CreateGrpcCli(host string) (*grpc.ClientConn, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
 	return grpc.Dial(host, opts...)
+}
+
+type CancelManager struct {
+	mut sync.Mutex
+	c   map[string]context.CancelFunc
+}
+
+func NewCancelManager() *CancelManager {
+	return &CancelManager{
+		c: make(map[string]context.CancelFunc),
+	}
+}
+
+func (cm *CancelManager) Has(key string) bool {
+	cm.mut.Lock()
+	defer cm.mut.Unlock()
+	_, ok := cm.c[key]
+	return ok
+}
+
+func (cm *CancelManager) Keys() []string {
+	cm.mut.Lock()
+	defer cm.mut.Unlock()
+	res := []string{}
+	for k := range cm.c {
+		res = append(res, k)
+	}
+	return res
+}
+
+func (cm *CancelManager) Add(key string, _ctx context.Context) (context.Context, error) {
+	cm.mut.Lock()
+	defer cm.mut.Unlock()
+	if _, ok := cm.c[key]; ok {
+		return nil, fmt.Errorf("key %s already exists", key)
+	}
+
+	ctx, cancel := context.WithCancel(_ctx)
+	cm.c[key] = cancel
+	return ctx, nil
+}
+
+func (cm *CancelManager) Cancel(key string) error {
+	cm.mut.Lock()
+	defer cm.mut.Unlock()
+	cancel, ok := cm.c[key]
+	if !ok {
+		return fmt.Errorf("key %s does not exist", key)
+	}
+	cancel()
+	delete(cm.c, key)
+	return nil
 }
 
 func Debug(p interface{}) {

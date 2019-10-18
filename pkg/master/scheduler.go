@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -15,56 +14,14 @@ import (
 )
 
 var (
-	masterCtx     context.Context
-	cancelManager *CancelManager
+	MasterCtx context.Context
+	CancelMgr *CancelManager
 )
-
-type CancelManager struct {
-	mut sync.Mutex
-	c   map[string]context.CancelFunc
-}
-
-func NewCancelManager() *CancelManager {
-	return &CancelManager{
-		c: make(map[string]context.CancelFunc),
-	}
-}
-
-func (cm *CancelManager) Has(key string) bool {
-	cm.mut.Lock()
-	defer cm.mut.Unlock()
-	_, ok := cm.c[key]
-	return ok
-}
-
-func (cm *CancelManager) Add(key string, _ctx context.Context) (context.Context, error) {
-	cm.mut.Lock()
-	defer cm.mut.Unlock()
-	if _, ok := cm.c[key]; ok {
-		return nil, fmt.Errorf("key %s already exists", key)
-	}
-
-	ctx, cancel := context.WithCancel(_ctx)
-	cm.c[key] = cancel
-	return ctx, nil
-}
-
-func (cm *CancelManager) Cancel(key string) error {
-	cm.mut.Lock()
-	defer cm.mut.Unlock()
-	cancel, ok := cm.c[key]
-	if !ok {
-		return fmt.Errorf("key %s does not exist", key)
-	}
-	cancel()
-	delete(cm.c, key)
-	return nil
-}
 
 func RunScheduler(db *gorm.DB) {
 	// initialize
-	masterCtx = context.Background()
-	cancelManager = NewCancelManager()
+	MasterCtx = context.Background()
+	CancelMgr = NewCancelManager()
 	rand.Seed(time.Now().UnixNano())
 
 	ticker := time.NewTicker(time.Second * 5)
@@ -86,8 +43,8 @@ func doSchedule(db *gorm.DB) error {
 
 	log.Printf("checking rounds")
 
-	// find past unexecuted round
-	db.Preload("Results").Where("start_at <= ?", time.Now()).Find(&rounds)
+	// find past unexecuted round or manually added ones
+	db.Preload("Results").Where("start_at <= ?", time.Now()).Or("start_at = NULL").Find(&rounds)
 
 	for _, round := range rounds {
 		// skip if already executed
@@ -95,14 +52,25 @@ func doSchedule(db *gorm.DB) error {
 			continue
 		}
 
-		// get latest hash
-		image, err := findImage(db, round)
+		digest, err := func() (string, error) {
+			// return specified hash if exists
+			if round.ExploitHash != "" {
+				return round.ExploitHash, nil
+			}
+			// get latest hash
+			image, err := findImage(db, round)
+			if err != nil {
+				return "", err
+			}
+			return image.Digest, nil
+		}()
 		if err != nil {
 			continue
 		}
-		log.Printf("found: %s\n", image.Digest)
 
-		if err := doRound(db, round, *image); err != nil {
+		log.Printf("found: %s\n", digest)
+
+		if err := doRound(db, round, digest); err != nil {
 			log.Printf("%+v", err)
 		}
 	}
@@ -126,9 +94,9 @@ func findImage(db *gorm.DB, round Round) (*Image, error) {
 	return &image, nil
 }
 
-func doRound(db *gorm.DB, round Round, image Image) error {
+func doRound(db *gorm.DB, round Round, digest string) error {
 	yml, err := EscapedTemplate(round.Yml, map[string]string{
-		"exploitHash": image.Digest,
+		"exploitHash": "@" + digest,
 	})
 	if err != nil {
 		return err
@@ -139,7 +107,7 @@ func doRound(db *gorm.DB, round Round, image Image) error {
 	result := Result{}
 	db.Model(&round).Association("Results").Append(&result)
 
-	ctx, err := cancelManager.Add(fmt.Sprintf("%d"), masterCtx)
+	ctx, err := CancelMgr.Add(fmt.Sprintf("%d", round.ID), MasterCtx)
 
 	workerHosts := strings.Split(round.WorkerHosts, ",")
 	for i := 0; i < int(round.Ntrials); i++ {
@@ -147,7 +115,7 @@ func doRound(db *gorm.DB, round Round, image Image) error {
 
 		uuid := NewUUID()
 		// avoid conflication
-		for ok := cancelManager.Has(uuid); ok; uuid = NewUUID() {
+		for ok := CancelMgr.Has(uuid); ok; uuid = NewUUID() {
 		}
 
 		req := &pb.RunnerRequest{
@@ -158,10 +126,10 @@ func doRound(db *gorm.DB, round Round, image Image) error {
 			FlagTemplate:  round.FlagTemplate,
 		}
 
-		_ctx, _ := cancelManager.Add(uuid, ctx) // uuid was checked beforehand
+		_ctx, _ := CancelMgr.Add(uuid, ctx) // uuid was checked beforehand
 
 		go func() {
-			defer cancelManager.Cancel(uuid)
+			defer CancelMgr.Cancel(uuid)
 
 			grpcCli, err := CreateGrpcCli(workerhost)
 			defer grpcCli.Close()
