@@ -50,7 +50,8 @@ func main() {
 	e.GET("/result", handler.GetResult(db))
 	e.GET("/result/:id", handler.GetResult(db))
 
-	e.GET("/job", handler.GetWorkerResults(db))
+	e.GET("/job", handler.GetJob(db))
+	e.GET("/job/:id", handler.GetJob(db))
 
 	e.GET("/dockerhash", handler.DockerHash(db))
 

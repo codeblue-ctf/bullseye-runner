@@ -105,11 +105,23 @@ func GetResult(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
-func GetWorkerResults(db *gorm.DB) echo.HandlerFunc {
+func GetJob(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		jobs := []models.Job{}
-		db.Find(&jobs)
-		return c.JSON(http.StatusOK, jobs)
+		id := c.Param("id")
+		if id == "" {
+			// return all jobs
+			jobs := []models.Job{}
+			db.Find(&jobs)
+			return c.JSON(http.StatusOK, jobs)
+		}
+		// return specific job
+		job := models.Job{}
+		hit := 0
+		db.Where("id = ?", id).Find(&job).Count(&hit)
+		if hit == 0 {
+			return c.JSON(http.StatusNotFound, "job not found")
+		}
+		return c.JSON(http.StatusOK, job)
 	}
 }
 
