@@ -16,12 +16,39 @@ import (
 var (
 	MasterCtx context.Context
 	CancelMgr *CancelManager
+	jobCh     chan Job
 )
+
+// updateResult
+func updateResult(db *gorm.DB) {
+	resultMap := make(map[uint][]Job)
+
+	cnt := len(jobCh)
+	log.Printf("updating: %d", len(jobCh))
+	for cnt > 0 {
+		job := <-jobCh
+		log.Printf("%+v", job)
+		resultMap[job.ResultID] = append(resultMap[job.ResultID], job)
+		cnt--
+	}
+
+	for resultID, jobs := range resultMap {
+		result := Result{}
+		db.Where("id = ?", resultID).Find(&result)
+		for _, job := range jobs {
+			if job.Succeeded {
+				result.Succeeded++
+			}
+		}
+		db.Save(&result)
+	}
+}
 
 func RunScheduler(db *gorm.DB) {
 	// initialize
 	MasterCtx = context.Background()
 	CancelMgr = NewCancelManager()
+	jobCh = make(chan Job, 100000)
 	rand.Seed(time.Now().UnixNano())
 
 	ticker := time.NewTicker(time.Second * 5)
@@ -34,6 +61,7 @@ func RunScheduler(db *gorm.DB) {
 			if err != nil {
 				log.Printf("schedule error: %v", err)
 			}
+			// updateResult(db)
 		}
 	}
 }
@@ -68,8 +96,6 @@ func doSchedule(db *gorm.DB) error {
 			continue
 		}
 
-		log.Printf("found: %s\n", digest)
-
 		if err := doRound(db, round, digest); err != nil {
 			log.Printf("%+v", err)
 		}
@@ -102,7 +128,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 		return err
 	}
 
-	log.Printf("scheduling round: %d\n", round.ID)
+	log.Printf("scheduling round: %d", round.ID)
 
 	result := Result{}
 	db.Model(&round).Association("Results").Append(&result)
@@ -118,10 +144,17 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 		for ok := CancelMgr.Has(uuid); ok; uuid = NewUUID() {
 		}
 
+		_yml, err := EscapedTemplate(yml, map[string]int{
+			"trialNumber": i,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to generate yml: %+v", err)
+		}
+
 		req := &pb.RunnerRequest{
 			Uuid:          uuid,
 			Timeout:       uint64(round.Timeout),
-			Yml:           yml,
+			Yml:           _yml,
 			RegistryToken: "test",
 			FlagTemplate:  round.FlagTemplate,
 		}
@@ -138,8 +171,10 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 				return
 			}
 
-			job := Job{
+			job := &Job{
 				UUID: req.Uuid,
+				Done: false,
+				Host: workerhost,
 			}
 			db.Model(&result).Association("Jobs").Append(&job)
 
@@ -151,7 +186,12 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 
 			job.Succeeded = res.Succeeded
 			job.Output = res.Output
+			job.Done = true
+
 			db.Save(&job)
+
+			// jobCh <- job
+			log.Printf("added job: %+v", job)
 		}()
 	}
 

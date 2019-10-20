@@ -43,12 +43,13 @@ type Result struct {
 	gorm.Model
 	Succeeded uint  `json:"succeeded"`
 	RoundID   uint  `json:"round_id"`
-	Jobs      []Job `json:"jobs,omitempty"`
+	Jobs      []Job `json:"-"`
 }
 
 type Job struct {
 	gorm.Model
 	UUID      string `json:"uuid"`
+	Done      bool   `json:"done"`
 	Host      string `json:"host"`
 	Succeeded bool   `json:"succeeded"`
 	Output    string `json:"output"`
