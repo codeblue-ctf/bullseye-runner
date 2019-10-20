@@ -152,11 +152,12 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 		}
 
 		req := &pb.RunnerRequest{
-			Uuid:          uuid,
-			Timeout:       uint64(round.Timeout),
-			Yml:           _yml,
-			RegistryToken: "test",
-			FlagTemplate:  round.FlagTemplate,
+			Uuid:             uuid,
+			Timeout:          uint64(round.Timeout),
+			Yml:              _yml,
+			RegistryUsername: round.RegistryUsername,
+			RegistryPassword: round.RegistryPassword,
+			FlagTemplate:     round.FlagTemplate,
 		}
 
 		_ctx, _ := CancelMgr.Add(uuid, ctx) // uuid was checked beforehand

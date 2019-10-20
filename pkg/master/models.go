@@ -9,34 +9,40 @@ import (
 
 type Schedule struct {
 	gorm.Model
-	StartAt      time.Time `json:"start_at"`
-	StopAt       time.Time `json:"stop_at"`
-	Yml          string    `json:"yml"`
-	FlagTemplate string    `json:"flag_template"`
-	Interval     uint      `json:"interval"`
-	Ntrials      uint      `json:"ntrials"`
-	Timeout      uint      `json:"timeout"`
-	WorkerHosts  string    `json:"worker_hosts"`
-	CallbackURL  string    `json:"callback_url"`
-	ProblemID    string    `json:"problem_id"`
-	TeamID       string    `json:"team_id"`
-	Rounds       []Round   `json:"rounds,omitempty"`
+	StartAt          time.Time `json:"start_at"`
+	StopAt           time.Time `json:"stop_at"`
+	Yml              string    `json:"yml"`
+	FlagTemplate     string    `json:"flag_template"`
+	Interval         uint      `json:"interval"`
+	Ntrials          uint      `json:"ntrials"`
+	Timeout          uint      `json:"timeout"`
+	WorkerHosts      string    `json:"worker_hosts"`
+	RegistryHost     string    `json:"registry_host"`
+	RegistryUsername string    `json:"registry_username"`
+	RegistryPassword string    `json:"registry_password"`
+	CallbackURL      string    `json:"callback_url"`
+	ProblemID        string    `json:"problem_id"`
+	TeamID           string    `json:"team_id"`
+	Rounds           []Round   `json:"rounds,omitempty"`
 }
 
 type Round struct {
 	gorm.Model
-	StartAt      *time.Time `json:"start_at"`
-	Yml          string     `json:"yml"`
-	FlagTemplate string     `json:"flag_template"`
-	Ntrials      uint       `json:"ntrials"`
-	Timeout      uint       `json:"timeout"`
-	WorkerHosts  string     `json:"worker_hosts"`
-	CallbackURL  string     `json:"callback_url"`
-	ProblemID    string     `json:"problem_id"`
-	TeamID       string     `json:"team_id"`
-	ScheduleID   uint       `json:"schedule_id"`
-	ExploitHash  string     `json:"exploit_hash,omitempty"`
-	Results      []Result   `json:"-"`
+	StartAt          *time.Time `json:"start_at"`
+	Yml              string     `json:"yml"`
+	FlagTemplate     string     `json:"flag_template"`
+	Ntrials          uint       `json:"ntrials"`
+	Timeout          uint       `json:"timeout"`
+	WorkerHosts      string     `json:"worker_hosts"`
+	RegistryHost     string     `json:"registry_host"`
+	RegistryUsername string     `json:"registry_username"`
+	RegistryPassword string     `json:"registry_password"`
+	CallbackURL      string     `json:"callback_url"`
+	ProblemID        string     `json:"problem_id"`
+	TeamID           string     `json:"team_id"`
+	ScheduleID       uint       `json:"schedule_id"`
+	ExploitHash      string     `json:"exploit_hash,omitempty"`
+	Results          []Result   `json:"-"`
 }
 
 type Result struct {
@@ -72,15 +78,18 @@ func (s *Schedule) AfterCreate(db *gorm.DB) error {
 	for t := s.StartAt; t.Before(s.StopAt); t = t.Add(time.Duration(s.Interval) * time.Minute) {
 		_t := t
 		round := Round{
-			StartAt:      &_t,
-			Yml:          s.Yml,
-			FlagTemplate: s.FlagTemplate,
-			Ntrials:      s.Ntrials,
-			Timeout:      s.Timeout,
-			WorkerHosts:  s.WorkerHosts,
-			CallbackURL:  s.CallbackURL,
-			ProblemID:    s.ProblemID,
-			TeamID:       s.TeamID,
+			StartAt:          &_t,
+			Yml:              s.Yml,
+			FlagTemplate:     s.FlagTemplate,
+			Ntrials:          s.Ntrials,
+			Timeout:          s.Timeout,
+			WorkerHosts:      s.WorkerHosts,
+			RegistryHost:     s.RegistryHost,
+			RegistryUsername: s.RegistryUsername,
+			RegistryPassword: s.RegistryPassword,
+			CallbackURL:      s.CallbackURL,
+			ProblemID:        s.ProblemID,
+			TeamID:           s.TeamID,
 		}
 		rounds = append(rounds, round)
 	}

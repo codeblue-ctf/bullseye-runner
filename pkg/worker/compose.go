@@ -89,11 +89,11 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 
 	configFile := &configfile.ConfigFile{
 		AuthConfigs: map[string]clitypes.AuthConfig{
-			"localhost:5000": clitypes.AuthConfig{
-				Username: "admin",
-				Password: "password",
+			req.RegistryHost: clitypes.AuthConfig{
+				Username: req.RegistryUsername,
+				Password: req.RegistryPassword,
 				// Auth:          req.DockerRegistryToken,
-				ServerAddress: "localhost:5000",
+				ServerAddress: req.RegistryHost,
 			},
 		},
 	}

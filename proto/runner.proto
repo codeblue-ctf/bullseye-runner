@@ -5,8 +5,10 @@ message RunnerRequest {
     string uuid = 1;
     uint64 timeout = 2; // millseconds
     string yml = 3;
-    string registry_token = 4;
-    string flag_template = 5;
+    string registry_host = 4;
+    string registry_username = 5;
+    string registry_password = 6;
+    string flag_template = 7;
 }
 
 message RunnerResponse {
