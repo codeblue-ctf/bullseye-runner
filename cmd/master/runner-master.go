@@ -18,7 +18,6 @@ func initDB(db *gorm.DB) {
 		&master.Round{},
 		&master.Result{},
 		&master.Job{},
-		&master.Image{},
 	)
 }
 

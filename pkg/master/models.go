@@ -21,8 +21,8 @@ type Schedule struct {
 	RegistryUsername string    `json:"registry_username"`
 	RegistryPassword string    `json:"registry_password"`
 	CallbackURL      string    `json:"callback_url"`
-	ProblemID        string    `json:"problem_id"`
-	TeamID           string    `json:"team_id"`
+	Problem          string    `json:"problem"`
+	Team             string    `json:"team"`
 	Rounds           []Round   `json:"rounds,omitempty"`
 }
 
@@ -38,8 +38,8 @@ type Round struct {
 	RegistryUsername string     `json:"registry_username"`
 	RegistryPassword string     `json:"registry_password"`
 	CallbackURL      string     `json:"callback_url"`
-	ProblemID        string     `json:"problem_id"`
-	TeamID           string     `json:"team_id"`
+	Problem          string     `json:"problem"`
+	Team             string     `json:"team"`
 	ScheduleID       uint       `json:"schedule_id"`
 	ExploitHash      string     `json:"exploit_hash,omitempty"`
 	Results          []Result   `json:"-"`
@@ -66,8 +66,8 @@ type Image struct {
 	gorm.Model
 	UUID       string `json:"uuid"`
 	Digest     string `json:"digest"`
-	TeamID     string `json:"team_id"`
-	ProblemID  string `json:"problem_id"`
+	Team       string `json:"team"`
+	Problem    string `json:"problem"`
 	RemoteAddr string `json:"remote_addr"`
 	UserAgent  string `json:"user_agent"`
 }
@@ -88,8 +88,8 @@ func (s *Schedule) AfterCreate(db *gorm.DB) error {
 			RegistryUsername: s.RegistryUsername,
 			RegistryPassword: s.RegistryPassword,
 			CallbackURL:      s.CallbackURL,
-			ProblemID:        s.ProblemID,
-			TeamID:           s.TeamID,
+			Problem:          s.Problem,
+			Team:             s.Team,
 		}
 		rounds = append(rounds, round)
 	}

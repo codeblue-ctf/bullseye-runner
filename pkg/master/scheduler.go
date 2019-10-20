@@ -108,7 +108,7 @@ func findImage(db *gorm.DB, round Round) (*Image, error) {
 	image := Image{}
 	hit := 0
 
-	db.Where("team_id = ? and problem_id = ?", round.TeamID, round.ProblemID).
+	db.Where("team = ? and problem = ?", round.Team, round.Problem).
 		Where("created_at <= ?", round.StartAt).
 		Order("created_at").
 		First(&image).Count(&hit)
@@ -123,6 +123,8 @@ func findImage(db *gorm.DB, round Round) (*Image, error) {
 func doRound(db *gorm.DB, round Round, digest string) error {
 	yml, err := EscapedTemplate(round.Yml, map[string]string{
 		"exploitHash": "@" + digest,
+		"team":        round.Team,
+		"problem":     round.Problem,
 	})
 	if err != nil {
 		return err

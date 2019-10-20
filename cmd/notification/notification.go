@@ -51,20 +51,20 @@ func Notification(db *gorm.DB) echo.HandlerFunc {
 				continue
 			}
 
-			var teamID, problemID string
+			var team, problem string
 			if strings.Contains(event.Target.Repository, "/") {
 				sep := strings.Split(event.Target.Repository, "/")
-				teamID = sep[0]
-				problemID = sep[1]
+				team = sep[0]
+				problem = sep[1]
 			} else {
-				problemID = event.Target.Repository
+				problem = event.Target.Repository
 			}
 
 			image := master.Image{
 				UUID:       event.Id,
 				Digest:     event.Target.Digest,
-				TeamID:     teamID,
-				ProblemID:  problemID,
+				Team:       team,
+				Problem:    problem,
 				RemoteAddr: event.Request.Addr,
 				UserAgent:  event.Request.Useragent,
 			}

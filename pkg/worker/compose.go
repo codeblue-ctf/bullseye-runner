@@ -76,8 +76,9 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	}
 
 	dict := map[string]string{
-		"flagPath":   flagPath,
-		"submitPath": submitPath,
+		"registryHost": req.RegistryHost,
+		"flagPath":     flagPath,
+		"submitPath":   submitPath,
 	}
 
 	err = tpl.Execute(&yml, dict)
