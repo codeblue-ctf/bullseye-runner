@@ -157,6 +157,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 			Uuid:             uuid,
 			Timeout:          uint64(round.Timeout),
 			Yml:              _yml,
+			RegistryHost:     round.RegistryHost,
 			RegistryUsername: round.RegistryUsername,
 			RegistryPassword: round.RegistryPassword,
 			FlagTemplate:     round.FlagTemplate,
