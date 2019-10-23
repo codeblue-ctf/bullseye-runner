@@ -70,14 +70,15 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	defer CleanFlags(req.Uuid)
 
 	var yml bytes.Buffer
-	tpl, err := template.New("yml").Parse(req.DockerComposeYml)
+	tpl, err := template.New("yml").Parse(req.Yml)
 	if err != nil {
 		return false, "", err
 	}
 
 	dict := map[string]string{
-		"flagPath":   flagPath,
-		"submitPath": submitPath,
+		"registryHost": req.RegistryHost,
+		"flagPath":     flagPath,
+		"submitPath":   submitPath,
 	}
 
 	err = tpl.Execute(&yml, dict)
@@ -89,11 +90,11 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 
 	configFile := &configfile.ConfigFile{
 		AuthConfigs: map[string]clitypes.AuthConfig{
-			"localhost:5000": clitypes.AuthConfig{
-				Username: "admin",
-				Password: "password",
+			req.RegistryHost: clitypes.AuthConfig{
+				Username: req.RegistryUsername,
+				Password: req.RegistryPassword,
 				// Auth:          req.DockerRegistryToken,
-				ServerAddress: "localhost:5000",
+				ServerAddress: req.RegistryHost,
 			},
 		},
 	}
@@ -115,12 +116,12 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 		return false, "", err
 	}
 
+	defer cleanCompose(req, project)
 	err = project.Up(ctx, options.Up{})
 	if err != nil {
 		log.Printf("failed to up: %v", err)
 		return false, "", err
 	}
-	defer cleanCompose(req, project)
 
 	time.Sleep(time.Duration(req.Timeout) * time.Millisecond)
 

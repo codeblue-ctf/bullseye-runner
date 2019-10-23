@@ -2,15 +2,17 @@ syntax = "proto3";
 package proto;
 
 message RunnerRequest {
-    string uuid = 1; // UUID
-    int32 timeout = 2; // millseconds
-    string docker_compose_yml = 3;
-    string docker_registry_token = 4;
-    string flag_template = 5;
+    string uuid = 1;
+    uint64 timeout = 2; // millseconds
+    string yml = 3;
+    string registry_host = 4;
+    string registry_username = 5;
+    string registry_password = 6;
+    string flag_template = 7;
 }
 
 message RunnerResponse {
-    string uuid = 1; // UUID
+    string uuid = 1;
     bool succeeded = 2; // true if exploit is succeeded
     string output = 3;
 }
