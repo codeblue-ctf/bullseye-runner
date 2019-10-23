@@ -55,7 +55,6 @@ type Result struct {
 type Job struct {
 	gorm.Model
 	UUID      string `json:"uuid"`
-	Done      bool   `json:"done"`
 	Host      string `json:"host"`
 	Succeeded bool   `json:"succeeded"`
 	Output    string `json:"output"`

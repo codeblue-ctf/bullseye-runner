@@ -13,34 +13,45 @@ import (
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
 
+type JobQ struct {
+	job  *Job
+	done chan struct{}
+}
+
 var (
 	MasterCtx context.Context
 	CancelMgr *CancelManager
-	jobCh     chan Job
+	jqCh      chan JobQ
 )
 
 // updateResult
 func updateResult(db *gorm.DB) {
-	resultMap := make(map[uint][]Job)
+	resultMap := make(map[uint][]JobQ)
 
-	cnt := len(jobCh)
-	log.Printf("updating: %d", len(jobCh))
+	cnt := len(jqCh)
 	for cnt > 0 {
-		job := <-jobCh
-		log.Printf("%+v", job)
-		resultMap[job.ResultID] = append(resultMap[job.ResultID], job)
+		jq := <-jqCh
+		job := jq.job
+		// log.Printf("%+v", job)
+		resultMap[job.ResultID] = append(resultMap[job.ResultID], jq)
 		cnt--
 	}
 
-	for resultID, jobs := range resultMap {
+	for resultID, jqs := range resultMap {
 		result := Result{}
-		db.Where("id = ?", resultID).Find(&result)
-		for _, job := range jobs {
-			if job.Succeeded {
+		db.Find(&result, "id = ?", resultID)
+		jobs := []Job{}
+		for _, jq := range jqs {
+			if jq.job.Succeeded {
 				result.Succeeded++
 			}
+			jobs = append(jobs, *jq.job)
 		}
 		db.Save(&result)
+		db.Model(&result).Association("Jobs").Append(jobs)
+		for _, jq := range jqs {
+			close(jq.done)
+		}
 	}
 }
 
@@ -48,7 +59,7 @@ func RunScheduler(db *gorm.DB) {
 	// initialize
 	MasterCtx = context.Background()
 	CancelMgr = NewCancelManager()
-	jobCh = make(chan Job, 100000)
+	jqCh = make(chan JobQ, 100000)
 	rand.Seed(time.Now().UnixNano())
 
 	ticker := time.NewTicker(time.Second * 5)
@@ -61,7 +72,7 @@ func RunScheduler(db *gorm.DB) {
 			if err != nil {
 				log.Printf("schedule error: %v", err)
 			}
-			// updateResult(db)
+			updateResult(db)
 		}
 	}
 }
@@ -175,27 +186,27 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 				return
 			}
 
-			job := &Job{
-				UUID: req.Uuid,
-				Done: false,
-				Host: workerhost,
-			}
-			db.Model(&result).Association("Jobs").Append(&job)
-
 			res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, _ctx)
 			if err != nil {
 				log.Printf("error in SendRequest: %+v", err)
 				return
 			}
 
-			job.Succeeded = res.Succeeded
-			job.Output = res.Output
-			job.Done = true
+			job := &Job{
+				UUID:      req.Uuid,
+				Host:      workerhost,
+				Succeeded: res.Succeeded,
+				Output:    res.Output,
+				ResultID:  result.ID,
+			}
 
-			db.Save(&job)
+			jq := JobQ{
+				job:  job,
+				done: make(chan struct{}, 0),
+			}
 
-			// jobCh <- job
-			log.Printf("added job: %+v", job)
+			jqCh <- jq // send result to update daemon
+			<-jq.done  // wait response from update daemon
 		}()
 	}
 
@@ -203,6 +214,16 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 }
 
 func SendRequest(client pb.RunnerClient, req *pb.RunnerRequest, ctx context.Context) (*pb.RunnerResponse, error) {
+	res := &pb.RunnerResponse{
+		Uuid:      req.Uuid,
+		Succeeded: true,
+		Output:    "",
+	}
+
+	time.Sleep(10 * time.Second)
+
+	return res, nil
+
 	res, err := client.Run(ctx, req)
 	if err != nil {
 		log.Fatalf("%v.Run(_) = _, %v", client, err)
