@@ -32,7 +32,9 @@ func prepareNetwork(ctx context.Context, req *pb.RunnerRequest) error {
 		log.Printf("failed to create env client: %v", err)
 		return err
 	}
-	_, err = client.NetworkCreate(ctx, networkID, apitypes.NetworkCreate{})
+	_, err = client.NetworkCreate(ctx, networkID, apitypes.NetworkCreate{
+		Internal: true,
+	})
 	if err != nil {
 		log.Printf("failed to create network: %v", err)
 		return err
@@ -141,4 +143,61 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	}
 
 	return false, "", nil
+}
+
+func PullDockerCompose(ctx context.Context, req *pb.RunnerRequest) error {
+	flagPath, submitPath, err := PrepareFlags(req.Uuid, req.FlagTemplate)
+	if err != nil {
+		return err
+	}
+	defer CleanFlags(req.Uuid)
+
+	var yml bytes.Buffer
+	tpl, err := template.New("yml").Parse(req.Yml)
+	if err != nil {
+		return err
+	}
+
+	dict := map[string]string{
+		"registryHost": req.RegistryHost,
+		"flagPath":     flagPath,
+		"submitPath":   submitPath,
+	}
+
+	err = tpl.Execute(&yml, dict)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("execute yml: %#v", yml.String())
+
+	configFile := &configfile.ConfigFile{
+		AuthConfigs: map[string]clitypes.AuthConfig{
+			req.RegistryHost: clitypes.AuthConfig{
+				Username: req.RegistryUsername,
+				Password: req.RegistryPassword,
+				// Auth:          req.DockerRegistryToken,
+				ServerAddress: req.RegistryHost,
+			},
+		},
+	}
+
+	project, err := docker.NewProject(&dockerctx.Context{
+		Context: project.Context{
+			ComposeBytes: [][]byte{yml.Bytes()},
+			ProjectName:  req.Uuid,
+		},
+		ConfigFile: configFile,
+		AuthLookup: auth.NewConfigLookup(configFile),
+	}, nil)
+	if err != nil {
+		return err
+	}
+
+	err = project.Pull(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

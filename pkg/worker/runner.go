@@ -202,6 +202,16 @@ func CleanFlags(uuid string) error {
 
 // run received yml and return results as RunnerResponse
 func RunRequest(ctx context.Context, req *pb.RunnerRequest) (*pb.RunnerResponse, error) {
+	if req.PullImage {
+		err := PullDockerCompose(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+
+		res := &pb.RunnerResponse{}
+		return res, nil
+	}
+
 	succeeded, output, err := RunDockerCompose(ctx, req)
 	if err != nil {
 		log.Printf("error: %v", err)
