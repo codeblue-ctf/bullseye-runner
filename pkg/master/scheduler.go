@@ -262,6 +262,7 @@ func SendRequest(client pb.RunnerClient, req *pb.RunnerRequest, ctx context.Cont
 	res, err := client.Run(ctx, req)
 	if err != nil {
 		logger.Warn("grpc error", zap.Error(err))
+		return nil, err
 	}
 	logger.Info("response", zap.String("response", fmt.Sprintf("%+v", res)))
 
