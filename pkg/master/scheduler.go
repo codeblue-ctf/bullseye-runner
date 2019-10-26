@@ -1,10 +1,13 @@
 package master
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
@@ -24,9 +27,31 @@ var (
 	jqCh      chan JobQ
 )
 
+func sendCallback(url string, results []Result) error {
+	if url == "" {
+		return nil
+	}
+	buf, err := json.Marshal(results)
+	if err != nil {
+		return err
+	}
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(buf))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode/100 != 2 { // != 2xx
+		return fmt.Errorf("status is %d (!= 2xx)", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // updateResult
 func updateResult(db *gorm.DB) {
 	resultMap := make(map[uint][]JobQ)
+	callbackMap := make(map[string][]Result)
 
 	cnt := len(jqCh)
 	for cnt > 0 {
@@ -52,7 +77,24 @@ func updateResult(db *gorm.DB) {
 		for _, jq := range jqs {
 			close(jq.done)
 		}
+
+		// send callback
+		round := Round{}
+		db.Find(&round, "id = ?", result.RoundID)
+		url := round.CallbackURL
+		if url != "" {
+			callbackMap[url] = append(callbackMap[url], result)
+		}
 	}
+
+	go func() {
+		for url, results := range callbackMap {
+			err := sendCallback(url, results)
+			if err != nil {
+				log.Printf("callback: %+v", err)
+			}
+		}
+	}()
 }
 
 func RunScheduler(db *gorm.DB) {
@@ -180,11 +222,11 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 			defer CancelMgr.Cancel(uuid)
 
 			grpcCli, err := CreateGrpcCli(workerhost)
-			defer grpcCli.Close()
 			if err != nil {
 				log.Printf("failed to create grpc connection: %+v", err)
 				return
 			}
+			defer grpcCli.Close()
 
 			res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, _ctx)
 			if err != nil {
