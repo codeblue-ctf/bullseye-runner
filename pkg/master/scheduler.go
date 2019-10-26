@@ -214,19 +214,9 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 }
 
 func SendRequest(client pb.RunnerClient, req *pb.RunnerRequest, ctx context.Context) (*pb.RunnerResponse, error) {
-	res := &pb.RunnerResponse{
-		Uuid:      req.Uuid,
-		Succeeded: true,
-		Output:    "",
-	}
-
-	time.Sleep(10 * time.Second)
-
-	return res, nil
-
 	res, err := client.Run(ctx, req)
 	if err != nil {
-		log.Fatalf("%v.Run(_) = _, %v", client, err)
+		log.Printf("%v.Run(_) = _, %v", client, err)
 	}
 	log.Printf("%+v", res)
 
