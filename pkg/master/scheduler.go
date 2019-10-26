@@ -199,6 +199,12 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 		return err
 	}
 
+	type WorkerInfo struct {
+		host string
+		ncpu uint64
+	}
+	workerInfos := []WorkerInfo{}
+
 	err = func() error {
 		logger.Debug("pulling image")
 		for _, workerhost := range strings.Split(round.WorkerHosts, ",") {
@@ -222,6 +228,15 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 				logger.Warn("PullRequest", zap.Error(err))
 				return err
 			}
+
+			// update CPU info per host
+			res, err := pb.NewRunnerClient(grpcCli).Info(ctx, &pb.InfoRequest{})
+			if err != nil {
+				logger.Warn("InfoRequest", zap.Error(err))
+				return err
+			}
+
+			workerInfos = append(workerInfos, WorkerInfo{host: workerhost, ncpu: res.Cpus})
 		}
 		return nil
 	}()
@@ -230,7 +245,14 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 		return err
 	}
 
-	workerHosts := strings.Split(round.WorkerHosts, ",")
+	// add weight according to num of CPUs
+	workerHosts := []string{}
+	for _, workerInfo := range workerInfos {
+		for i := 0; i < int(workerInfo.ncpu); i++ {
+			workerHosts = append(workerHosts, workerInfo.host)
+		}
+	}
+
 	for i := 0; i < int(round.Ntrials); i++ {
 		workerhost := workerHosts[i%len(workerHosts)]
 
