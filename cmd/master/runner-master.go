@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
+	"net/http/pprof"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -10,6 +12,10 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"gitlab.com/CBCTF/bullseye-runner/pkg/master"
 	"gitlab.com/CBCTF/bullseye-runner/pkg/master/handler"
+)
+
+var (
+	debug = flag.Bool("debug", false, "enable debug")
 )
 
 func initDB(db *gorm.DB) {
@@ -58,6 +64,17 @@ func main() {
 	e.GET("/running", handler.ListRunning)
 
 	e.GET("/image", handler.Image(db))
+
+	// pprof
+	if *debug {
+		log.Printf("pprof enabled")
+		pprofGroup := e.Group("/debug/pprof")
+		pprofGroup.Any("/cmdline", echo.WrapHandler(http.HandlerFunc(pprof.Cmdline)))
+		pprofGroup.Any("/profile", echo.WrapHandler(http.HandlerFunc(pprof.Profile)))
+		pprofGroup.Any("/symbol", echo.WrapHandler(http.HandlerFunc(pprof.Symbol)))
+		pprofGroup.Any("/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
+		pprofGroup.Any("/*", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
+	}
 
 	e.Logger.Fatal(e.Start(":8080"))
 }
