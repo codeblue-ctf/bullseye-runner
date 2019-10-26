@@ -24,6 +24,7 @@ type JobQ struct {
 var (
 	MasterCtx context.Context
 	CancelMgr *CancelManager
+	connPool  *ConnPool
 	jqCh      chan JobQ
 )
 
@@ -100,6 +101,7 @@ func RunScheduler(db *gorm.DB) {
 	// initialize
 	MasterCtx = context.Background()
 	CancelMgr = NewCancelManager()
+	connPool = NewConnPool()
 	jqCh = make(chan JobQ, 100000)
 	rand.Seed(time.Now().UnixNano())
 
@@ -208,12 +210,11 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 				FlagTemplate:     round.FlagTemplate,
 				PullImage:        true,
 			}
-			grpcCli, err := CreateGrpcCli(workerhost)
+			grpcCli, err := connPool.GetConn(workerhost)
 			if err != nil {
-				logger.Warn("failed to create grpc connection", zap.Error(err))
+				logger.Warn("failed to get grpc connection", zap.Error(err))
 				return err
 			}
-			defer grpcCli.Close()
 
 			_, err = SendRequest(pb.NewRunnerClient(grpcCli), req, ctx)
 			if err != nil {
@@ -259,12 +260,11 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 		go func() {
 			defer CancelMgr.Cancel(uuid)
 
-			grpcCli, err := CreateGrpcCli(workerhost)
+			grpcCli, err := connPool.GetConn(workerhost)
 			if err != nil {
-				logger.Warn("failed to create grpc connection", zap.Error(err))
+				logger.Warn("failed to get grpc connection", zap.Error(err))
 				return
 			}
-			defer grpcCli.Close()
 
 			res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, _ctx)
 			if err != nil {

@@ -1,7 +1,6 @@
 package master
 
 import (
-	"fmt"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -12,20 +11,15 @@ var (
 )
 
 type ConnPool struct {
-	connections map[string]*grpc.ClientConn
+	m sync.Map
 }
 
-func NewConnPool() ConnPool {
-	pool := ConnPool{}
-	pool.connections = make(map[string]*grpc.ClientConn)
-	return pool
+func NewConnPool() *ConnPool {
+	return &ConnPool{}
 }
 
 func (c *ConnPool) HasHost(host string) bool {
-	cpmut.Lock()
-	defer cpmut.Unlock()
-
-	_, ok := c.connections[host]
+	_, ok := c.m.Load(host)
 	return ok
 }
 
@@ -41,22 +35,20 @@ func (c *ConnPool) AddHost(host string) error {
 		return err
 	}
 
-	cpmut.Lock()
-	defer cpmut.Unlock()
-
-	c.connections[host] = conn
+	c.m.Store(host, conn)
 	return nil
 }
 
 func (c *ConnPool) GetConn(host string) (*grpc.ClientConn, error) {
-	cpmut.Lock()
-	defer cpmut.Unlock()
-
-	conn, ok := c.connections[host]
+	conn, ok := c.m.Load(host)
 
 	if !ok {
-		return nil, fmt.Errorf("no such connection: %s", host)
+		err := c.AddHost(host)
+		if err != nil {
+			return nil, err
+		}
+		return c.GetConn(host)
 	}
 
-	return conn, nil
+	return conn.(*grpc.ClientConn), nil
 }
