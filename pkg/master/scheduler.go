@@ -134,8 +134,8 @@ func doSchedule(db *gorm.DB) error {
 
 		digest, err := func() (string, error) {
 			// return specified hash if exists
-			if round.ExploitHash != "" {
-				return round.ExploitHash, nil
+			if round.ImageHash != "" {
+				return round.ImageHash, nil
 			}
 			// get latest hash
 			image, err := findImage(db, round)
@@ -143,6 +143,9 @@ func doSchedule(db *gorm.DB) error {
 				logger.Debug("couldn't find appropriate image")
 				return "", err
 			}
+			logger.Debug("found image", zap.String("image", fmt.Sprintf("%+v", image)))
+			round.ImageHash = image.Digest
+			db.Save(&round)
 			return image.Digest, nil
 		}()
 		if err != nil {

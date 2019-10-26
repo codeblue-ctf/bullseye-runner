@@ -41,7 +41,7 @@ type Round struct {
 	Problem          string     `json:"problem"`
 	Team             string     `json:"team"`
 	ScheduleID       uint       `json:"schedule_id"`
-	ExploitHash      string     `json:"exploit_hash,omitempty"`
+	ImageHash        string     `json:"image_hash,omitempty"`
 	Results          []Result   `json:"-"`
 }
 
