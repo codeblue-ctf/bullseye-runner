@@ -192,6 +192,41 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 	db.Model(&round).Association("Results").Append(&result)
 
 	ctx, err := CancelMgr.Add(fmt.Sprintf("%d", round.ID), MasterCtx)
+	if err != nil {
+		return err
+	}
+
+	err = func() error {
+		logger.Debug("pulling image")
+		for _, workerhost := range strings.Split(round.WorkerHosts, ",") {
+			req := &pb.RunnerRequest{
+				Uuid:             NewUUID(),
+				Yml:              yml,
+				RegistryHost:     round.RegistryHost,
+				RegistryUsername: round.RegistryUsername,
+				RegistryPassword: round.RegistryPassword,
+				FlagTemplate:     round.FlagTemplate,
+				PullImage:        true,
+			}
+			grpcCli, err := CreateGrpcCli(workerhost)
+			if err != nil {
+				logger.Warn("failed to create grpc connection", zap.Error(err))
+				return err
+			}
+			defer grpcCli.Close()
+
+			_, err = SendRequest(pb.NewRunnerClient(grpcCli), req, ctx)
+			if err != nil {
+				logger.Warn("PullRequest", zap.Error(err))
+				return err
+			}
+		}
+		return nil
+	}()
+	if err != nil {
+		logger.Warn("failed to pull image", zap.Error(err))
+		return err
+	}
 
 	workerHosts := strings.Split(round.WorkerHosts, ",")
 	for i := 0; i < int(round.Ntrials); i++ {
