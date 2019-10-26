@@ -34,6 +34,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to open db: %v", err)
 	}
+
+	master.InitLogger()
 	initDB(db)
 
 	go master.RunScheduler(db)

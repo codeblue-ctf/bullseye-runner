@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	"reflect"
 	"regexp"
@@ -119,5 +118,5 @@ func (cm *CancelManager) Cancel(key string) error {
 }
 
 func Debug(p interface{}) {
-	log.Printf("%+v", p)
+	logger.Debug(fmt.Sprintf("%+v", p))
 }

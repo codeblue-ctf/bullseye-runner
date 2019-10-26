@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
+	"go.uber.org/zap"
 )
 
 type JobQ struct {
@@ -57,7 +57,6 @@ func updateResult(db *gorm.DB) {
 	for cnt > 0 {
 		jq := <-jqCh
 		job := jq.job
-		// log.Printf("%+v", job)
 		resultMap[job.ResultID] = append(resultMap[job.ResultID], jq)
 		cnt--
 	}
@@ -91,7 +90,7 @@ func updateResult(db *gorm.DB) {
 		for url, results := range callbackMap {
 			err := sendCallback(url, results)
 			if err != nil {
-				log.Printf("callback: %+v", err)
+				logger.Warn("callback", zap.Error(err))
 			}
 		}
 	}()
@@ -112,7 +111,7 @@ func RunScheduler(db *gorm.DB) {
 		case <-ticker.C:
 			err := doSchedule(db)
 			if err != nil {
-				log.Printf("schedule error: %v", err)
+				logger.Warn("scheduling error", zap.Error(err))
 			}
 			updateResult(db)
 		}
@@ -122,7 +121,7 @@ func RunScheduler(db *gorm.DB) {
 func doSchedule(db *gorm.DB) error {
 	var rounds []Round
 
-	log.Printf("checking rounds")
+	logger.Debug("checking rounds")
 
 	// find past unexecuted round or manually added ones
 	db.Preload("Results").Where("start_at <= ?", time.Now()).Or("start_at = NULL").Find(&rounds)
@@ -141,6 +140,7 @@ func doSchedule(db *gorm.DB) error {
 			// get latest hash
 			image, err := findImage(db, round)
 			if err != nil {
+				logger.Debug("couldn't find appropriate image")
 				return "", err
 			}
 			return image.Digest, nil
@@ -150,7 +150,7 @@ func doSchedule(db *gorm.DB) error {
 		}
 
 		if err := doRound(db, round, digest); err != nil {
-			log.Printf("%+v", err)
+			logger.Warn("doRound", zap.Error(err))
 		}
 	}
 
@@ -183,7 +183,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 		return err
 	}
 
-	log.Printf("scheduling round: %d", round.ID)
+	logger.Info("scheduling round", zap.Int("roundID", int(round.ID)))
 
 	result := Result{}
 	db.Model(&round).Association("Results").Append(&result)
@@ -223,14 +223,14 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 
 			grpcCli, err := CreateGrpcCli(workerhost)
 			if err != nil {
-				log.Printf("failed to create grpc connection: %+v", err)
+				logger.Warn("failed to create grpc connection", zap.Error(err))
 				return
 			}
 			defer grpcCli.Close()
 
 			res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, _ctx)
 			if err != nil {
-				log.Printf("error in SendRequest: %+v", err)
+				logger.Warn("SendRequest", zap.Error(err))
 				return
 			}
 
@@ -258,9 +258,9 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 func SendRequest(client pb.RunnerClient, req *pb.RunnerRequest, ctx context.Context) (*pb.RunnerResponse, error) {
 	res, err := client.Run(ctx, req)
 	if err != nil {
-		log.Printf("%v.Run(_) = _, %v", client, err)
+		logger.Warn("grpc error", zap.Error(err))
 	}
-	log.Printf("%+v", res)
+	logger.Info("response", zap.String("response", fmt.Sprintf("%+v", res)))
 
 	return res, nil
 }
