@@ -48,6 +48,7 @@ type Round struct {
 type Result struct {
 	gorm.Model
 	Succeeded uint  `json:"succeeded"`
+	Executed  uint  `json:"executed"`
 	RoundID   uint  `json:"round_id"`
 	Jobs      []Job `json:"-"`
 }

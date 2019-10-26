@@ -23,8 +23,7 @@ var (
 
 func initJobQueue() {
 	cpus := runtime.NumCPU()
-	log.Printf("cpu: %d", cpus)
-	worker.JobQueue = make(chan struct{}, cpus*10)
+	worker.JobQueue = make(chan struct{}, cpus*2)
 }
 
 func main() {

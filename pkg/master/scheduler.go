@@ -70,6 +70,7 @@ func updateResult(db *gorm.DB) {
 			if jq.job.Succeeded {
 				result.Succeeded++
 			}
+			result.Executed++
 			jobs = append(jobs, *jq.job)
 		}
 		db.Save(&result)
