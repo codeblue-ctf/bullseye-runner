@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
+	"runtime"
 
 	"google.golang.org/grpc/credentials"
 
@@ -21,7 +21,11 @@ var (
 	port     = flag.Int("port", 10080, "port to listen")
 )
 
-const Tempdir = "./tmp"
+func initJobQueue() {
+	cpus := runtime.NumCPU()
+	log.Printf("cpu: %d", cpus)
+	worker.JobQueue = make(chan struct{}, cpus*10)
+}
 
 func main() {
 	flag.Parse()
@@ -29,12 +33,6 @@ func main() {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
-	}
-
-	if _, err = os.Stat(Tempdir); err != nil {
-		if err2 := os.Mkdir(Tempdir, 0755); err2 != nil {
-			log.Fatalf("failed to create directory: %s", Tempdir)
-		}
 	}
 
 	var opts []grpc.ServerOption
@@ -46,6 +44,8 @@ func main() {
 		}
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
+
+	initJobQueue()
 
 	server := grpc.NewServer(opts...)
 	pb.RegisterRunnerServer(server, &worker.RunnerServer{})
