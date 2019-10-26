@@ -9,6 +9,7 @@ message RunnerRequest {
     string registry_username = 5;
     string registry_password = 6;
     string flag_template = 7;
+    bool pull_image = 8;
 }
 
 message RunnerResponse {
@@ -17,6 +18,15 @@ message RunnerResponse {
     string output = 3;
 }
 
+message InfoRequest {
+
+}
+
+message InfoResponse {
+    uint64 cpus = 1;
+}
+
 service Runner {
     rpc Run (RunnerRequest) returns (RunnerResponse);
+    rpc Info (InfoRequest) returns (InfoResponse);
 }
