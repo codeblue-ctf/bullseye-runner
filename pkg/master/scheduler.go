@@ -30,6 +30,10 @@ var (
 	jqCh      chan JobQ
 )
 
+const (
+	X11CapPrefix = "/var/tmp"
+)
+
 func sendCallback(url string, results []Result) error {
 	if url == "" {
 		return nil
@@ -317,7 +321,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 			}
 
 			if round.X11required {
-				err := ioutil.WriteFile(fmt.Sprintf("/tmp/%s.%s", req.Uuid, req.X11Info.CapExt), res.X11Cap, 0644)
+				err := ioutil.WriteFile(fmt.Sprintf("%s/%s.%s", X11CapPrefix, req.Uuid, req.X11Info.CapExt), res.X11Cap, 0644)
 				if err != nil {
 					logger.Warn("failed to save X11 capture", zap.Error(err))
 				}

@@ -166,7 +166,7 @@ func DeleteJob(db *gorm.DB) echo.HandlerFunc {
 func GetJobCapture(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		uuid := c.Param("uuid")
-		path := fmt.Sprintf("/tmp/%s.mp4", uuid)
+		path := fmt.Sprintf("%s/%s.mp4", master.X11CapPrefix, uuid)
 		return c.File(path)
 	}
 }
