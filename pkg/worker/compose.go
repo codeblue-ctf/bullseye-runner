@@ -96,7 +96,6 @@ func (r *Runner) prepareFlags() error {
 	r.submitPath = submitPath
 
 	return nil
-
 }
 
 func (r *Runner) cleanFlags() error {

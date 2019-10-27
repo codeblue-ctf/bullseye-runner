@@ -107,7 +107,7 @@ func RunScheduler(db *gorm.DB) {
 	jqCh = make(chan JobQ, 100000)
 	rand.Seed(time.Now().UnixNano())
 
-	ticker := time.NewTicker(time.Second * 5)
+	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
 
 	for {
@@ -341,7 +341,7 @@ func SendRequest(client pb.RunnerClient, req *pb.RunnerRequest, ctx context.Cont
 		logger.Warn("grpc error", zap.Error(err))
 		return nil, err
 	}
-	logger.Debug("response", zap.String("uuid", res.Uuid))
+	logger.Debug("response", zap.String("uuid", res.Uuid), zap.Bool("succeeded", res.Succeeded))
 
 	return res, nil
 }
