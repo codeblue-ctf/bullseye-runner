@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"text/template"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	dockerctx "github.com/docker/libcompose/docker/ctx"
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/project/options"
+	"github.com/lucasjones/reggen"
 
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
@@ -62,7 +64,7 @@ func (r *Runner) prepareFlags() error {
 	submitPath := fmt.Sprintf("%s/%s-%s", TempDir, r.uuid, SubmitSuffix)
 
 	// generate flag from template regex
-	flagStr, err := GenerateFlag(r.req.FlagTemplate)
+	flagStr, err := generateFlag(r.req.FlagTemplate)
 	if err != nil {
 		log.Printf("failed to generate flag: %v", err)
 		return err
@@ -254,23 +256,22 @@ func (r *Runner) Run() (bool, error) {
 	return false, nil
 }
 
-func PullDockerCompose(ctx context.Context, req *pb.RunnerRequest) error {
-	flagPath, submitPath, err := PrepareFlags(req.Uuid, req.FlagTemplate)
-	if err != nil {
+func (r *Runner) DryRun() error {
+	if err := r.prepareFlags(); err != nil {
 		return err
 	}
-	defer CleanFlags(req.Uuid)
+	defer r.cleanFlags()
 
 	var yml bytes.Buffer
-	tpl, err := template.New("yml").Parse(req.Yml)
+	tpl, err := template.New("yml").Parse(r.req.Yml)
 	if err != nil {
 		return err
 	}
 
 	dict := map[string]string{
-		"registryHost": req.RegistryHost,
-		"flagPath":     flagPath,
-		"submitPath":   submitPath,
+		"registryHost": r.req.RegistryHost,
+		"flagPath":     r.flagPath,
+		"submitPath":   r.submitPath,
 	}
 
 	err = tpl.Execute(&yml, dict)
@@ -282,11 +283,11 @@ func PullDockerCompose(ctx context.Context, req *pb.RunnerRequest) error {
 
 	configFile := &configfile.ConfigFile{
 		AuthConfigs: map[string]clitypes.AuthConfig{
-			req.RegistryHost: clitypes.AuthConfig{
-				Username: req.RegistryUsername,
-				Password: req.RegistryPassword,
+			r.req.RegistryHost: clitypes.AuthConfig{
+				Username: r.req.RegistryUsername,
+				Password: r.req.RegistryPassword,
 				// Auth:          req.DockerRegistryToken,
-				ServerAddress: req.RegistryHost,
+				ServerAddress: r.req.RegistryHost,
 			},
 		},
 	}
@@ -294,7 +295,7 @@ func PullDockerCompose(ctx context.Context, req *pb.RunnerRequest) error {
 	project, err := docker.NewProject(&dockerctx.Context{
 		Context: project.Context{
 			ComposeBytes: [][]byte{yml.Bytes()},
-			ProjectName:  req.Uuid,
+			ProjectName:  r.uuid,
 		},
 		ConfigFile: configFile,
 		AuthLookup: auth.NewConfigLookup(configFile),
@@ -303,10 +304,22 @@ func PullDockerCompose(ctx context.Context, req *pb.RunnerRequest) error {
 		return err
 	}
 
-	err = project.Pull(ctx)
+	err = project.Pull(r.ctx)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func generateFlag(template string) (string, error) {
+	g, err := reggen.NewGenerator(template)
+	if err != nil {
+		return "", err
+	}
+	return g.Generate(10), nil
+}
+
+func trim(s []byte) string {
+	return strings.Trim(fmt.Sprintf("%s", s), " \x00\r\n")
 }

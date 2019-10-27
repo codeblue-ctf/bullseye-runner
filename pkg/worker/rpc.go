@@ -16,23 +16,30 @@ func (s *RunnerServer) Run(ctx context.Context, req *pb.RunnerRequest) (*pb.Runn
 	log.Printf("received: %v", req)
 
 	if req.PullImage {
-		res, err := RunRequest(ctx, req)
+		runner := NewRunner(ctx, req)
+		err := runner.DryRun()
 		if err != nil {
-			log.Printf("error: %v", err)
 			return nil, err
 		}
+
+		res := &pb.RunnerResponse{}
 		return res, nil
 	}
 
 	JobQueue <- struct{}{}
+	runner := NewRunner(ctx, req)
+	succeeded, err := runner.Run()
+	<-JobQueue
 
-	res, err := RunRequest(ctx, req)
 	if err != nil {
 		log.Printf("error: %v", err)
 		return nil, err
 	}
 
-	<-JobQueue
+	res := &pb.RunnerResponse{
+		Uuid:      req.Uuid,
+		Succeeded: succeeded,
+	}
 
 	return res, nil
 }
