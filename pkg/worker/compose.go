@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
 	"text/template"
 	"time"
 
@@ -21,24 +23,124 @@ import (
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
 
-func checkX11(req *pb.RunnerRequest) (bool, bool) {
+const (
+	TempDir      = "/tmp"
+	FlagSuffix   = "flag"
+	SubmitSuffix = "submit"
+)
+
+type Runner struct {
+	uuid    string
+	ctx     context.Context
+	req     *pb.RunnerRequest
+	project project.APIProject
+
+	flagPath   string
+	submitPath string
+
+	x11required  bool
+	x11capturing bool
+}
+
+func NewRunner(ctx context.Context, req *pb.RunnerRequest) *Runner {
 	x11required := req.X11Info != nil
 	x11capturing := x11required && req.X11Info.CapExt != ""
-	return x11required, x11capturing
+
+	runner := &Runner{
+		uuid:         req.Uuid,
+		ctx:          ctx,
+		req:          req,
+		x11required:  x11required,
+		x11capturing: x11capturing,
+	}
+
+	return runner
 }
 
-func getNeworkID(uuid string) string {
-	return fmt.Sprintf("%s_default", uuid)
+func (r *Runner) prepareFlags() error {
+	flagPath := fmt.Sprintf("%s/%s-%s", TempDir, r.uuid, FlagSuffix)
+	submitPath := fmt.Sprintf("%s/%s-%s", TempDir, r.uuid, SubmitSuffix)
+
+	// generate flag from template regex
+	flagStr, err := GenerateFlag(r.req.FlagTemplate)
+	if err != nil {
+		log.Printf("failed to generate flag: %v", err)
+		return err
+	}
+	log.Printf("generated flag: %s", flagStr)
+
+	// write generated flag
+	flagFile, err := os.Create(flagPath)
+	if err != nil {
+		return err
+	}
+	_, err = flagFile.WriteString(flagStr)
+	if err != nil {
+		return err
+	}
+	if err = flagFile.Close(); err != nil {
+		return err
+	}
+
+	// create empty flag for submittion
+	submitFile, err := os.Create(submitPath)
+	if err = submitFile.Close(); err != nil {
+		return err
+	}
+
+	r.flagPath = flagPath
+	r.submitPath = submitPath
+
+	return nil
+
 }
 
-func prepareNetwork(ctx context.Context, req *pb.RunnerRequest) error {
-	networkID := getNeworkID(req.Uuid)
+func (r *Runner) cleanFlags() error {
+	if err := os.Remove(r.flagPath); err != nil {
+		return err
+	}
+	if err := os.Remove(r.submitPath); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Runner) checkFlag() (bool, error) {
+	submitBytes, err := ioutil.ReadFile(r.submitPath)
+	if err != nil {
+		log.Printf("failed to open submitted flag")
+		return false, err
+	}
+
+	flagBytes, err := ioutil.ReadFile(r.flagPath)
+	if err != nil {
+		log.Printf("failed to open flag")
+		return false, err
+	}
+	submitStr := trim(submitBytes)
+	flagStr := trim(flagBytes)
+
+	if submitStr == flagStr {
+		log.Printf("correct flag: %s", flagStr)
+		return true, nil
+	}
+	log.Printf("incorrect flag: %#v (!= %#v)", submitStr, flagStr)
+
+	return false, nil
+}
+
+func (r *Runner) getNeworkID() string {
+	return fmt.Sprintf("%s_default", r.uuid)
+}
+
+func (r *Runner) prepareNetwork() error {
+	networkID := r.getNeworkID()
 	client, err := client.NewEnvClient()
 	if err != nil {
 		log.Printf("failed to create env client: %v", err)
 		return err
 	}
-	_, err = client.NetworkCreate(ctx, networkID, apitypes.NetworkCreate{
+	_, err = client.NetworkCreate(r.ctx, networkID, apitypes.NetworkCreate{
 		Internal: true,
 	})
 	if err != nil {
@@ -49,8 +151,8 @@ func prepareNetwork(ctx context.Context, req *pb.RunnerRequest) error {
 	return nil
 }
 
-func cleanNetwork(req *pb.RunnerRequest) error {
-	networkID := getNeworkID(req.Uuid)
+func (r *Runner) cleanNetwork() error {
+	networkID := r.getNeworkID()
 	client, err := client.NewEnvClient()
 	if err != nil {
 		return err
@@ -62,59 +164,46 @@ func cleanNetwork(req *pb.RunnerRequest) error {
 	return nil
 }
 
-func cleanCompose(req *pb.RunnerRequest, project project.APIProject) {
-	x11required, x11capturing := checkX11(req)
-
-	if x11capturing {
-
-	}
-
-	project.Delete(context.Background(), options.Delete{
+func (r *Runner) cleanCompose() {
+	r.project.Delete(context.Background(), options.Delete{
 		RemoveVolume:  true,
 		RemoveRunning: true,
 	})
-	cleanNetwork(req)
+	r.cleanNetwork()
 }
 
-func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string, error) {
-	x11required, x11capturing := checkX11(req)
-
-	flagPath, submitPath, err := PrepareFlags(req.Uuid, req.FlagTemplate)
-	if err != nil {
-		return false, "", err
+func (r *Runner) Run() (bool, error) {
+	if err := r.prepareFlags(); err != nil {
+		return false, err
 	}
-	defer CleanFlags(req.Uuid)
+	defer r.cleanFlags()
 
 	var yml bytes.Buffer
-	tpl, err := template.New("yml").Parse(req.Yml)
+	tpl, err := template.New("yml").Parse(r.req.Yml)
 	if err != nil {
-		return false, "", err
+		return false, err
 	}
 
 	dict := map[string]string{
-		"registryHost": req.RegistryHost,
-		"flagPath":     flagPath,
-		"submitPath":   submitPath,
-	}
-
-	if x11required {
-		dict["X11Path"] = "hoge"
+		"registryHost": r.req.RegistryHost,
+		"flagPath":     r.flagPath,
+		"submitPath":   r.submitPath,
 	}
 
 	err = tpl.Execute(&yml, dict)
 	if err != nil {
-		return false, "", err
+		return false, err
 	}
 
 	log.Printf("execute yml: %#v", yml.String())
 
 	configFile := &configfile.ConfigFile{
 		AuthConfigs: map[string]clitypes.AuthConfig{
-			req.RegistryHost: clitypes.AuthConfig{
-				Username: req.RegistryUsername,
-				Password: req.RegistryPassword,
+			r.req.RegistryHost: clitypes.AuthConfig{
+				Username: r.req.RegistryUsername,
+				Password: r.req.RegistryPassword,
 				// Auth:          req.DockerRegistryToken,
-				ServerAddress: req.RegistryHost,
+				ServerAddress: r.req.RegistryHost,
 			},
 		},
 	}
@@ -122,49 +211,47 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	project, err := docker.NewProject(&dockerctx.Context{
 		Context: project.Context{
 			ComposeBytes: [][]byte{yml.Bytes()},
-			ProjectName:  req.Uuid,
+			ProjectName:  r.uuid,
 		},
 		ConfigFile: configFile,
 		AuthLookup: auth.NewConfigLookup(configFile),
 	}, nil)
 	if err != nil {
-		return false, "", err
+		return false, err
 	}
+	r.project = project
 
 	// create network in advance to make evaluation faster
-	if err := prepareNetwork(ctx, req); err != nil {
-		return false, "", err
+	if err := r.prepareNetwork(); err != nil {
+		return false, err
 	}
+	defer r.cleanNetwork()
 
-	if x11capturing {
-
-	}
-
-	defer cleanCompose(req, project)
-	err = project.Up(ctx, options.Up{})
+	err = project.Up(r.ctx, options.Up{})
 	if err != nil {
 		log.Printf("failed to up: %v", err)
-		return false, "", err
+		return false, err
 	}
+	defer r.cleanCompose()
 
-	time.Sleep(time.Duration(req.Timeout) * time.Millisecond)
+	time.Sleep(time.Duration(r.req.Timeout) * time.Millisecond)
 
-	err = project.Log(ctx, false)
+	err = project.Log(r.ctx, false)
 	if err != nil {
 		log.Printf("failed to get log: %v", err)
-		return false, "", err
+		return false, err
 	}
 
-	ok, err := CheckFlag(req.Uuid)
-
+	ok, err := r.checkFlag()
 	if err != nil {
-		return false, "", err
-	}
-	if ok {
-		return true, "", nil
+		return false, err
 	}
 
-	return false, "", nil
+	if ok {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func PullDockerCompose(ctx context.Context, req *pb.RunnerRequest) error {

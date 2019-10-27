@@ -16,11 +16,11 @@ import (
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
 
-const (
-	TempDir      = "/tmp"
-	FlagSuffix   = "flag"
-	SubmitSuffix = "submit"
-)
+// const (
+// 	TempDir      = "/tmp"
+// 	FlagSuffix   = "flag"
+// 	SubmitSuffix = "submit"
+// )
 
 func setupDirectory(yml string, flag string) (string, error) {
 	dir, err := ioutil.TempDir("./tmp", "bullseye-runner-")
@@ -202,7 +202,8 @@ func CleanFlags(uuid string) error {
 
 // run received yml and return results as RunnerResponse
 func RunRequest(ctx context.Context, req *pb.RunnerRequest) (*pb.RunnerResponse, error) {
-	succeeded, output, err := RunDockerCompose(ctx, req)
+	runner := NewRunner(ctx, req)
+	succeeded, err := runner.Run()
 	if err != nil {
 		log.Printf("error: %v", err)
 		return nil, err
@@ -211,7 +212,6 @@ func RunRequest(ctx context.Context, req *pb.RunnerRequest) (*pb.RunnerResponse,
 	res := pb.RunnerResponse{
 		Uuid:      req.Uuid,
 		Succeeded: succeeded,
-		Output:    output,
 	}
 
 	return &res, nil

@@ -42,7 +42,7 @@ func checkFfmpeg() {
 	if os.IsNotExist(err) {
 		panic("ffmpeg does not exist")
 	}
-	worker.FfmpegPath = *ffmpegpath
+	worker.FFmpegPath = *ffmpegpath
 }
 
 func main() {
