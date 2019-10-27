@@ -170,9 +170,10 @@ func (r *Runner) cleanNetwork() error {
 
 func (r *Runner) cleanCompose() {
 	if r.x11capturing {
-		if err := r.xvfbWindow.FFmpegCmd.Process.Signal(os.Interrupt); err != nil {
-			log.Printf("failed to kill ffmpeg: %+v", err)
-		}
+		r.xvfbWindow.FFmpegCmd.Wait()
+		// if err := r.xvfbWindow.FFmpegCmd.Process.Signal(os.Interrupt); err != nil {
+		// 	log.Printf("failed to kill ffmpeg: %+v", err)
+		// }
 	}
 
 	r.project.Delete(context.Background(), options.Delete{
@@ -255,7 +256,7 @@ func (r *Runner) Run() (bool, error) {
 	if r.x11capturing {
 		x11capPath := fmt.Sprintf("/tmp/%s.%s", r.uuid, r.req.X11Info.CapExt)
 		r.x11capPath = x11capPath
-		r.xvfbWindow.Capture(r.ctx, x11capPath, time.Duration(r.req.Timeout)*time.Second)
+		r.xvfbWindow.Capture(r.ctx, x11capPath, time.Duration(r.req.Timeout/1000)*time.Second)
 	}
 
 	err = project.Up(r.ctx, options.Up{})

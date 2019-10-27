@@ -62,6 +62,7 @@ func main() {
 	e.GET("/job", handler.GetJob(db))
 	e.GET("/job/:id", handler.GetJob(db))
 	e.DELETE("/job/:id", handler.DeleteJob(db))
+	e.GET("/job/capture/:uuid", handler.GetJobCapture(db))
 
 	e.GET("/running", handler.ListRunning)
 

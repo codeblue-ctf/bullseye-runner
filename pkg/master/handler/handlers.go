@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/jinzhu/gorm"
@@ -159,6 +160,14 @@ func DeleteJob(db *gorm.DB) echo.HandlerFunc {
 		}
 		db.Delete(&job)
 		return c.JSON(http.StatusOK, job)
+	}
+}
+
+func GetJobCapture(db *gorm.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		uuid := c.Param("uuid")
+		path := fmt.Sprintf("/tmp/%s.mp4", uuid)
+		return c.File(path)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -278,6 +279,15 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 			FlagTemplate:     round.FlagTemplate,
 		}
 
+		if round.X11required {
+			req.X11Info = &pb.X11Info{
+				Width:  1024,
+				Height: 768,
+				Depth:  24,
+				CapExt: "mp4",
+			}
+		}
+
 		_ctx, _ := CancelMgr.Add(uuid, ctx) // uuid was checked beforehand
 
 		go func() {
@@ -303,6 +313,13 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 				ResultID:  result.ID,
 			}
 
+			if round.X11required {
+				err := ioutil.WriteFile(fmt.Sprintf("/tmp/%s.%s", req.Uuid, req.X11Info.CapExt), res.X11Cap, 0644)
+				if err != nil {
+					logger.Warn("failed to save X11 capture", zap.Error(err))
+				}
+			}
+
 			jq := JobQ{
 				job:  job,
 				done: make(chan struct{}, 0),
@@ -322,7 +339,7 @@ func SendRequest(client pb.RunnerClient, req *pb.RunnerRequest, ctx context.Cont
 		logger.Warn("grpc error", zap.Error(err))
 		return nil, err
 	}
-	logger.Info("response", zap.String("response", fmt.Sprintf("%+v", res)))
+	logger.Debug("response", zap.String("uuid", res.Uuid))
 
 	return res, nil
 }

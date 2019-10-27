@@ -12,6 +12,7 @@ type Schedule struct {
 	StartAt          time.Time `json:"start_at"`
 	StopAt           time.Time `json:"stop_at"`
 	Yml              string    `json:"yml"`
+	X11required      bool      `json:"x11_required"`
 	FlagTemplate     string    `json:"flag_template"`
 	Interval         uint      `json:"interval"`
 	Ntrials          uint      `json:"ntrials"`
@@ -30,6 +31,7 @@ type Round struct {
 	gorm.Model
 	StartAt          *time.Time `json:"start_at"`
 	Yml              string     `json:"yml"`
+	X11required      bool       `json:"x11_required"`
 	FlagTemplate     string     `json:"flag_template"`
 	Ntrials          uint       `json:"ntrials"`
 	Timeout          uint       `json:"timeout"`
@@ -80,6 +82,7 @@ func (s *Schedule) AfterCreate(db *gorm.DB) error {
 		round := Round{
 			StartAt:          &_t,
 			Yml:              s.Yml,
+			X11required:      s.X11required,
 			FlagTemplate:     s.FlagTemplate,
 			Ntrials:          s.Ntrials,
 			Timeout:          s.Timeout,
