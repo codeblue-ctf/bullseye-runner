@@ -42,6 +42,8 @@ type Runner struct {
 
 	x11required  bool
 	x11capturing bool
+	xvfbWindow   *XvfbWindow
+	x11capPath   string
 }
 
 func NewRunner(ctx context.Context, req *pb.RunnerRequest) *Runner {
@@ -167,6 +169,12 @@ func (r *Runner) cleanNetwork() error {
 }
 
 func (r *Runner) cleanCompose() {
+	if r.x11capturing {
+		if err := r.xvfbWindow.FFmpegCmd.Process.Signal(os.Interrupt); err != nil {
+			log.Printf("failed to kill ffmpeg: %+v", err)
+		}
+	}
+
 	r.project.Delete(context.Background(), options.Delete{
 		RemoveVolume:  true,
 		RemoveRunning: true,
@@ -190,6 +198,21 @@ func (r *Runner) Run() (bool, error) {
 		"registryHost": r.req.RegistryHost,
 		"flagPath":     r.flagPath,
 		"submitPath":   r.submitPath,
+		"X11Path":      "/tmp/.X11-unix/X0",
+	}
+
+	if r.x11required {
+		x := r.req.X11Info
+		xw, err := XvfbMan.GetWindow(uint(x.Width), uint(x.Height), uint(x.Depth))
+		if err != nil {
+			return false, nil
+		}
+		x11path, err := xw.GetX11Path()
+		if err != nil {
+			return false, nil
+		}
+		dict["X11Path"] = x11path
+		r.xvfbWindow = xw
 	}
 
 	err = tpl.Execute(&yml, dict)
@@ -228,6 +251,12 @@ func (r *Runner) Run() (bool, error) {
 		return false, err
 	}
 	defer r.cleanNetwork()
+
+	if r.x11capturing {
+		x11capPath := fmt.Sprintf("/tmp/%s.%s", r.uuid, r.req.X11Info.CapExt)
+		r.x11capPath = x11capPath
+		r.xvfbWindow.Capture(r.ctx, x11capPath, time.Duration(r.req.Timeout)*time.Second)
+	}
 
 	err = project.Up(r.ctx, options.Up{})
 	if err != nil {
@@ -272,6 +301,7 @@ func (r *Runner) DryRun() error {
 		"registryHost": r.req.RegistryHost,
 		"flagPath":     r.flagPath,
 		"submitPath":   r.submitPath,
+		"X11Path":      "/tmp/.X11-unix",
 	}
 
 	err = tpl.Execute(&yml, dict)

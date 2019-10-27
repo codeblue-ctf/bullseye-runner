@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 var (
 	XvfbPath   string
 	FFmpegPath string
+	XvfbMan    *XvfbManager
 )
 
 type XvfbManager struct {
@@ -28,6 +30,10 @@ type XvfbWindow struct {
 	depth     uint
 }
 
+func InitXvfb() {
+	XvfbMan = NewXvfbManager()
+}
+
 func NewXvfbManager() *XvfbManager {
 	xm := &XvfbManager{}
 
@@ -41,29 +47,41 @@ func NewXvfbManager() *XvfbManager {
 	return xm
 }
 
-func (x *XvfbManager) AddDisplay(width, height, depth uint) *XvfbWindow {
+func (x *XvfbManager) NewWindow(width, height, depth uint) (*XvfbWindow, error) {
 	x.amut.Lock()
 	display := x.available[0]
 	x.available = x.available[1:]
 	x.amut.Unlock()
 
 	xw := NewXvfbWindow(display, width, height, depth)
+	if err := xw.CreateXvfb(); err != nil {
+		return nil, err
+	}
 	x.m.Store(display, xw)
-	return xw
+	return xw, nil
 }
 
-func (x *XvfbManager) GetAvailableDisplay(width, height, depth uint) *XvfbWindow {
+func (x *XvfbManager) GetWindow(width, height, depth uint) (*XvfbWindow, error) {
 	var hit uint
 	x.m.Range(func(k, v interface{}) bool {
 		xw := v.(*XvfbWindow)
-		if xw.width == width && xw.height == height && xw.depth == depth &&
-			xw.FFmpegCmd.ProcessState.Exited() {
-			hit = k.(uint)
-			return false
+		if xw.width == width && xw.height == height && xw.depth == depth {
+			if xw.FFmpegCmd != nil && (xw.FFmpegCmd.Process == nil || xw.FFmpegCmd.ProcessState != nil && xw.FFmpegCmd.ProcessState.Exited()) {
+				hit = k.(uint)
+				return false
+			}
 		}
 		return true
 	})
 	xw, ok := x.m.Load(hit)
+	if !ok {
+		return x.NewWindow(width, height, depth)
+	}
+	return xw.(*XvfbWindow), nil
+}
+
+func (x *XvfbManager) GetDisplay(display uint) *XvfbWindow {
+	xw, ok := x.m.Load(display)
 	if !ok {
 		return nil
 	}
@@ -103,8 +121,8 @@ func (x *XvfbWindow) CreateXvfb() error {
 }
 
 // Capture will execute FFmpeg in background.
-func (x *XvfbWindow) Capture(outfile string, duration time.Duration) error {
-	cmd := exec.Command(FFmpegPath, "-f", "x11grab", "-video_size", fmt.Sprintf("%dx%d", x.width, x.height), "-i", fmt.Sprintf(":%d", x.display), "-t", fmt.Sprintf("%f", duration.Seconds()), outfile)
+func (x *XvfbWindow) Capture(ctx context.Context, outfile string, duration time.Duration) error {
+	cmd := exec.CommandContext(ctx, FFmpegPath, "-f", "x11grab", "-video_size", fmt.Sprintf("%dx%d", x.width, x.height), "-i", fmt.Sprintf(":%d", x.display), "-t", fmt.Sprintf("%f", duration.Seconds()), outfile)
 	err := cmd.Start()
 	if err != nil {
 		return err

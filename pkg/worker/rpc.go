@@ -2,7 +2,9 @@ package worker
 
 import (
 	"context"
+	"io/ioutil"
 	"log"
+	"os"
 	"runtime"
 
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
@@ -36,9 +38,21 @@ func (s *RunnerServer) Run(ctx context.Context, req *pb.RunnerRequest) (*pb.Runn
 		return nil, err
 	}
 
+	var x11cap []byte
+	if runner.x11capturing {
+		x11cap, err = ioutil.ReadFile(runner.x11capPath)
+		if err != nil {
+			return nil, err
+		}
+		if err := os.Remove(runner.x11capPath); err != nil {
+			return nil, err
+		}
+	}
+
 	res := &pb.RunnerResponse{
 		Uuid:      req.Uuid,
 		Succeeded: succeeded,
+		X11Cap:    x11cap,
 	}
 
 	return res, nil
