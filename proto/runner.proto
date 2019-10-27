@@ -9,13 +9,22 @@ message RunnerRequest {
     string registry_username = 5;
     string registry_password = 6;
     string flag_template = 7;
-    bool pull_image = 8;
+    X11Info x11info = 8;
+    bool pull_image = 9;
+}
+
+message X11Info {
+    uint64 width = 1;
+    uint64 height = 2;
+    uint64 depth = 3;
+    string cap_ext = 4;
 }
 
 message RunnerResponse {
     string uuid = 1;
     bool succeeded = 2; // true if exploit is succeeded
     string output = 3;
+    bytes x11cap = 4;
 }
 
 message InfoRequest {

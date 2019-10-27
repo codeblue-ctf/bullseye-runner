@@ -21,6 +21,12 @@ import (
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 )
 
+func checkX11(req *pb.RunnerRequest) (bool, bool) {
+	x11required := req.X11Info != nil
+	x11capturing := x11required && req.X11Info.CapExt != ""
+	return x11required, x11capturing
+}
+
 func getNeworkID(uuid string) string {
 	return fmt.Sprintf("%s_default", uuid)
 }
@@ -57,6 +63,12 @@ func cleanNetwork(req *pb.RunnerRequest) error {
 }
 
 func cleanCompose(req *pb.RunnerRequest, project project.APIProject) {
+	x11required, x11capturing := checkX11(req)
+
+	if x11capturing {
+
+	}
+
 	project.Delete(context.Background(), options.Delete{
 		RemoveVolume:  true,
 		RemoveRunning: true,
@@ -65,6 +77,8 @@ func cleanCompose(req *pb.RunnerRequest, project project.APIProject) {
 }
 
 func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string, error) {
+	x11required, x11capturing := checkX11(req)
+
 	flagPath, submitPath, err := PrepareFlags(req.Uuid, req.FlagTemplate)
 	if err != nil {
 		return false, "", err
@@ -81,6 +95,10 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 		"registryHost": req.RegistryHost,
 		"flagPath":     flagPath,
 		"submitPath":   submitPath,
+	}
+
+	if x11required {
+		dict["X11Path"] = "hoge"
 	}
 
 	err = tpl.Execute(&yml, dict)
@@ -116,6 +134,10 @@ func RunDockerCompose(ctx context.Context, req *pb.RunnerRequest) (bool, string,
 	// create network in advance to make evaluation faster
 	if err := prepareNetwork(ctx, req); err != nil {
 		return false, "", err
+	}
+
+	if x11capturing {
+
 	}
 
 	defer cleanCompose(req, project)

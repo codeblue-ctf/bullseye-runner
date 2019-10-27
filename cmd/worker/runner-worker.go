@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"runtime"
 
 	"google.golang.org/grpc/credentials"
@@ -16,9 +17,11 @@ import (
 )
 
 var (
-	certFile = flag.String("cert", "", "TLS certificate")
-	keyFile  = flag.String("key", "", "TLS private key")
-	port     = flag.Int("port", 10080, "port to listen")
+	certFile   = flag.String("cert", "", "TLS certificate")
+	keyFile    = flag.String("key", "", "TLS private key")
+	port       = flag.Int("port", 10080, "port to listen")
+	xvfbpath   = flag.String("xvfbpath", "/usr/bin/Xvfb", "path to Xvfb binary")
+	ffmpegpath = flag.String("ffmpegpath", "/usr/bin/ffmpeg", "path to ffmpeg")
 )
 
 func initJobQueue() {
@@ -26,8 +29,27 @@ func initJobQueue() {
 	worker.JobQueue = make(chan struct{}, cpus*2)
 }
 
+func checkXvfb() {
+	_, err := os.Stat(*xvfbpath)
+	if os.IsNotExist(err) {
+		panic("Xvfb does not exist")
+	}
+	worker.XvfbPath = *xvfbpath
+}
+
+func checkFfmpeg() {
+	_, err := os.Stat(*ffmpegpath)
+	if os.IsNotExist(err) {
+		panic("ffmpeg does not exist")
+	}
+	worker.FfmpegPath = *ffmpegpath
+}
+
 func main() {
 	flag.Parse()
+
+	checkXvfb()
+	checkFfmpeg()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
