@@ -18,6 +18,7 @@ require (
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/go-playground/validator v9.30.0+incompatible
+	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gogo/protobuf v1.3.0 // indirect
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1 // indirect
@@ -57,7 +58,7 @@ require (
 	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0 // indirect
 	golang.org/x/tools v0.0.0-20190926165942-a8d5d34286bd // indirect
 	google.golang.org/api v0.10.0 // indirect
-	google.golang.org/appengine v1.6.3 // indirect
+	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/genproto v0.0.0-20190916214212-f660b8655731 // indirect
 	google.golang.org/grpc v1.23.1
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect

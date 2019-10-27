@@ -11,7 +11,7 @@ type Schedule struct {
 	gorm.Model
 	StartAt          time.Time `json:"start_at"`
 	StopAt           time.Time `json:"stop_at"`
-	Yml              string    `json:"yml"`
+	Yml              string    `json:"yml" sql:"type:text;"`
 	X11required      bool      `json:"x11_required"`
 	FlagTemplate     string    `json:"flag_template"`
 	Interval         uint      `json:"interval"`
@@ -30,7 +30,7 @@ type Schedule struct {
 type Round struct {
 	gorm.Model
 	StartAt          *time.Time `json:"start_at"`
-	Yml              string     `json:"yml"`
+	Yml              string     `json:"yml" sql:"type:text;"`
 	X11required      bool       `json:"x11_required"`
 	FlagTemplate     string     `json:"flag_template"`
 	Ntrials          uint       `json:"ntrials"`
