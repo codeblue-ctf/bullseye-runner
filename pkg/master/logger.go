@@ -8,9 +8,13 @@ import (
 
 var logger *zap.Logger
 
-func InitLogger() {
+func InitLogger(debug bool) {
 	var err error
-	logger, err = zap.NewDevelopment()
+	if debug {
+		logger, err = zap.NewDevelopment()
+	} else {
+		logger, err = zap.NewProduction()
+	}
 	if err != nil {
 		log.Fatalf("failed to init logger: %+v", err)
 	}

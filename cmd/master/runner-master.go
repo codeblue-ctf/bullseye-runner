@@ -49,7 +49,7 @@ func main() {
 		log.Fatalf("failed to open db: %v", err)
 	}
 
-	master.InitLogger()
+	master.InitLogger(*debug)
 	initDB(db)
 
 	go master.RunScheduler(db)
@@ -93,5 +93,5 @@ func main() {
 		pprofGroup.Any("/*", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
 	}
 
-	e.Logger.Fatal(e.Start(":8080"))
+	e.Logger.Fatal(e.Start(Port))
 }
