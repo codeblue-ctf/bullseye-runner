@@ -156,9 +156,11 @@ func doSchedule(db *gorm.DB) error {
 			continue
 		}
 
-		if err := doRound(db, round, digest); err != nil {
-			logger.Warn("doRound", zap.Error(err))
-		}
+		go func() {
+			if err := doRound(db, round, digest); err != nil {
+				logger.Warn("doRound", zap.Error(err))
+			}
+		}()
 	}
 
 	return nil
