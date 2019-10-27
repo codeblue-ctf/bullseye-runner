@@ -177,7 +177,7 @@ func findImage(db *gorm.DB, round Round) (*Image, error) {
 
 	db.Where("team = ? and exploit_container = ?", round.Team, round.ExploitContainer).
 		Where("created_at <= ?", round.StartAt).
-		Order("created_at").
+		Order("created_at desc", true).
 		First(&image).Count(&hit)
 
 	if hit == 0 {
