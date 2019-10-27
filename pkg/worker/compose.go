@@ -169,8 +169,11 @@ func (r *Runner) cleanNetwork() error {
 
 func (r *Runner) cleanCompose() {
 	if r.x11capturing {
-		r.xvfbWindow.FFmpegCmd.Wait()
-		// if err := r.xvfbWindow.FFmpegCmd.Process.Signal(os.Interrupt); err != nil {
+		err := r.xvfbWindow.FFmpegCmd.Wait()
+		if err != nil {
+			log.Printf("failed to wait ffmpeg: %+v", err)
+		}
+		// if err := r.xvfbWindow.FFmpegCmd.Process.Kill(); err != nil {
 		// 	log.Printf("failed to kill ffmpeg: %+v", err)
 		// }
 	}

@@ -66,7 +66,7 @@ func (x *XvfbManager) GetWindow(width, height, depth uint) (*XvfbWindow, error) 
 	x.m.Range(func(k, v interface{}) bool {
 		xw := v.(*XvfbWindow)
 		if xw.width == width && xw.height == height && xw.depth == depth {
-			if xw.FFmpegCmd != nil && (xw.FFmpegCmd.Process == nil || xw.FFmpegCmd.ProcessState != nil && xw.FFmpegCmd.ProcessState.Exited()) {
+			if xw.FFmpegCmd != nil && (xw.FFmpegCmd.ProcessState != nil && xw.FFmpegCmd.ProcessState.Exited()) {
 				hit = k.(uint)
 				return false
 			}
@@ -122,7 +122,7 @@ func (x *XvfbWindow) CreateXvfb() error {
 
 // Capture will execute FFmpeg in background.
 func (x *XvfbWindow) Capture(ctx context.Context, outfile string, duration time.Duration) error {
-	cmd := exec.CommandContext(ctx, FFmpegPath, "-f", "x11grab", "-video_size", fmt.Sprintf("%dx%d", x.width, x.height), "-i", fmt.Sprintf(":%d", x.display), "-t", fmt.Sprintf("%f", duration.Seconds()), outfile)
+	cmd := exec.CommandContext(ctx, FFmpegPath, "-f", "x11grab", "-video_size", fmt.Sprintf("%dx%d", x.width, x.height), "-framerate", "25", "-i", fmt.Sprintf(":%d", x.display), "-t", fmt.Sprintf("%f", duration.Seconds()), outfile)
 	err := cmd.Start()
 	if err != nil {
 		return err

@@ -42,7 +42,7 @@ func (s *RunnerServer) Run(ctx context.Context, req *pb.RunnerRequest) (*pb.Runn
 	if runner.x11capturing {
 		x11cap, err = ioutil.ReadFile(runner.x11capPath)
 		if err != nil {
-			return nil, err
+			log.Printf("%+v", err)
 		}
 		if err := os.Remove(runner.x11capPath); err != nil {
 			return nil, err
