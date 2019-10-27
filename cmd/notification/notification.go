@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -12,6 +13,11 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"gitlab.com/CBCTF/bullseye-runner/pkg/master"
+)
+
+var (
+	DB_DIALECT = os.Getenv("DB_DIALECT")
+	DB_CONNECT = os.Getenv("DB_CONNECT")
 )
 
 type Events struct {
@@ -81,7 +87,16 @@ func initDB(db *gorm.DB) {
 }
 
 func main() {
-	db, err := gorm.Open("sqlite3", "test.db")
+
+	// default values
+	if DB_DIALECT == "" {
+		DB_DIALECT = "sqlite3"
+	}
+	if DB_CONNECT == "" {
+		DB_CONNECT = "test.db"
+	}
+
+	db, err := gorm.Open(DB_DIALECT, DB_CONNECT)
 	if err != nil {
 		log.Fatalf("failed to open db: %v", err)
 	}

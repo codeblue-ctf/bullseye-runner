@@ -5,8 +5,10 @@ import (
 	"log"
 	"net/http"
 	"net/http/pprof"
+	"os"
 
 	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -15,6 +17,9 @@ import (
 )
 
 var (
+	DB_DIALECT = os.Getenv("DB_DIALECT")
+	DB_CONNECT = os.Getenv("DB_CONNECT")
+
 	debug = flag.Bool("debug", false, "enable debug")
 )
 
@@ -30,7 +35,15 @@ func initDB(db *gorm.DB) {
 func main() {
 	flag.Parse()
 
-	db, err := gorm.Open("sqlite3", "test.db")
+	// default values
+	if DB_DIALECT == "" {
+		DB_DIALECT = "sqlite3"
+	}
+	if DB_CONNECT == "" {
+		DB_CONNECT = "test.db"
+	}
+
+	db, err := gorm.Open(DB_DIALECT, DB_CONNECT)
 	if err != nil {
 		log.Fatalf("failed to open db: %v", err)
 	}
