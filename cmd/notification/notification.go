@@ -69,22 +69,26 @@ func Notification(db *gorm.DB) echo.HandlerFunc {
 				continue
 			}
 
-			var team, problem string
+			var team, exploitContainer string
 			if strings.Contains(event.Target.Repository, "/") {
 				sep := strings.Split(event.Target.Repository, "/")
 				team = sep[0]
-				problem = sep[1]
+				exploitContainer = sep[1]
 			} else {
-				problem = event.Target.Repository
+				exploitContainer = event.Target.Repository
+			}
+
+			if team == "problems" || team == "public" {
+				continue
 			}
 
 			image := master.Image{
-				UUID:       event.Id,
-				Digest:     event.Target.Digest,
-				Team:       team,
-				Problem:    problem,
-				RemoteAddr: event.Request.Addr,
-				UserAgent:  event.Request.Useragent,
+				UUID:             event.Id,
+				Digest:           event.Target.Digest,
+				Team:             team,
+				ExploitContainer: exploitContainer,
+				RemoteAddr:       event.Request.Addr,
+				UserAgent:        event.Request.Useragent,
 			}
 			db.Create(&image)
 		}

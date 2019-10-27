@@ -15,6 +15,7 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 type JobQ struct {
@@ -170,7 +171,7 @@ func findImage(db *gorm.DB, round Round) (*Image, error) {
 	image := Image{}
 	hit := 0
 
-	db.Where("team = ? and problem = ?", round.Team, round.Problem).
+	db.Where("team = ? and exploit_container = ?", round.Team, round.ExploitContainer).
 		Where("created_at <= ?", round.StartAt).
 		Order("created_at").
 		First(&image).Count(&hit)
@@ -184,9 +185,9 @@ func findImage(db *gorm.DB, round Round) (*Image, error) {
 
 func doRound(db *gorm.DB, round Round, digest string) error {
 	yml, err := EscapedTemplate(round.Yml, map[string]string{
-		"exploitHash": "@" + digest,
-		"team":        round.Team,
-		"problem":     round.Problem,
+		"exploitHash":      "@" + digest,
+		"team":             round.Team,
+		"exploitContainer": round.ExploitContainer,
 	})
 	if err != nil {
 		return err
@@ -226,7 +227,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 				return err
 			}
 
-			_, err = SendRequest(pb.NewRunnerClient(grpcCli), req, ctx)
+			_, err = SendRequest(grpcCli, req, ctx)
 			if err != nil {
 				logger.Warn("PullRequest", zap.Error(err))
 				return err
@@ -301,7 +302,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 				return
 			}
 
-			res, err := SendRequest(pb.NewRunnerClient(grpcCli), req, _ctx)
+			res, err := SendRequest(grpcCli, req, _ctx)
 			if err != nil {
 				logger.Warn("SendRequest", zap.Error(err))
 				return
@@ -335,13 +336,13 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 	return nil
 }
 
-func SendRequest(client pb.RunnerClient, req *pb.RunnerRequest, ctx context.Context) (*pb.RunnerResponse, error) {
-	res, err := client.Run(ctx, req)
+func SendRequest(grpcCli *grpc.ClientConn, req *pb.RunnerRequest, ctx context.Context) (*pb.RunnerResponse, error) {
+	res, err := pb.NewRunnerClient(grpcCli).Run(ctx, req)
 	if err != nil {
 		logger.Warn("grpc error", zap.Error(err))
 		return nil, err
 	}
-	logger.Debug("response", zap.String("uuid", res.Uuid), zap.Bool("succeeded", res.Succeeded))
+	logger.Debug("response", zap.String("host", grpcCli.Target()), zap.String("uuid", res.Uuid), zap.Bool("succeeded", res.Succeeded))
 
 	return res, nil
 }
