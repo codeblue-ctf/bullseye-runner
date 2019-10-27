@@ -16,9 +16,18 @@ import (
 )
 
 var (
-	DB_DIALECT = os.Getenv("DB_DIALECT")
-	DB_CONNECT = os.Getenv("DB_CONNECT")
+	DbDialect = getenv("DB_DIALECT", "sqlite3")
+	DbConnect = getenv("DB_CONNECT", "test.db")
+	Port      = getenv("PORT", ":8081")
 )
+
+func getenv(key, fallback string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
+	}
+	return val
+}
 
 type Events struct {
 	Events []struct {
@@ -87,16 +96,7 @@ func initDB(db *gorm.DB) {
 }
 
 func main() {
-
-	// default values
-	if DB_DIALECT == "" {
-		DB_DIALECT = "sqlite3"
-	}
-	if DB_CONNECT == "" {
-		DB_CONNECT = "test.db"
-	}
-
-	db, err := gorm.Open(DB_DIALECT, DB_CONNECT)
+	db, err := gorm.Open(DbDialect, DbConnect)
 	if err != nil {
 		log.Fatalf("failed to open db: %v", err)
 	}
@@ -108,5 +108,5 @@ func main() {
 
 	e.Any("/*", Notification(db))
 
-	e.Logger.Fatal(e.Start(":8081"))
+	e.Logger.Fatal(e.Start(Port))
 }
