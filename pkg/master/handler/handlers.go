@@ -171,6 +171,45 @@ func GetJobCapture(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
+func GetSampleCaptureByRoundID(db *gorm.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		id := c.Param("id")
+		round := master.Round{}
+		hit := 0
+		db.Find(&round, "id = ?", id).Count(&hit)
+		if hit == 0 {
+			return c.JSON(http.StatusNotFound, "round not found")
+		}
+
+		results := []master.Result{}
+		db.Model(&round).Related(&results)
+		if len(results) == 0 {
+			return c.JSON(http.StatusNotFound, "result not found")
+		}
+
+		result := results[0]
+		jobs := []master.Job{}
+		db.Model(&result).Related(&jobs)
+
+		succeeded := []string{}
+		failed := []string{}
+		for _, job := range jobs {
+			if job.Succeeded {
+				succeeded = append(succeeded, job.UUID)
+			} else {
+				failed = append(failed, job.UUID)
+			}
+		}
+		return c.JSON(http.StatusOK, struct {
+			Succeeded []string `json:"succeeded"`
+			Failed    []string `json:"failed"`
+		}{
+			Succeeded: succeeded,
+			Failed:    failed,
+		})
+	}
+}
+
 func ListRunning(c echo.Context) error {
 	return c.JSON(http.StatusOK, master.CancelMgr.Keys())
 }
