@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
-	"os"
 )
 
 var (
@@ -16,11 +16,6 @@ var (
 func main() {
 	flag.Parse()
 
-	file, err := os.Create(*flagPath)
-	if err != nil {
-		log.Fatalf("failed to open file: %v", err)
-	}
-
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	defer listen.Close()
 
@@ -29,19 +24,16 @@ func main() {
 	}
 
 	conn, err := listen.Accept()
-
 	if err != nil {
 		log.Fatalf("failed to accept request: %v", err)
 	}
 
 	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
-	if err != nil {
-    log.Fatalf("failed to read: %v (buf: %+v)", err, buf)
+	if _, err := conn.Read(buf); err != nil {
+		log.Fatalf("failed to read: %v (buf: %+v)", err, buf)
 	}
 
-	_, err = file.Write(buf[:n])
-	if err != nil {
-		log.Fatalf("failed to write: %v", err)
+	if err := ioutil.WriteFile(*flagPath, buf, 0644); err != nil {
+		log.Fatalf("failed to write file: %+v", err)
 	}
 }
