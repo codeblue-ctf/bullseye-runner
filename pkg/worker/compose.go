@@ -20,6 +20,7 @@ import (
 	dockerctx "github.com/docker/libcompose/docker/ctx"
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/project/options"
+	"github.com/fsnotify/fsnotify"
 	"github.com/lucasjones/reggen"
 
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
@@ -278,12 +279,22 @@ func (r *Runner) Run() (bool, error) {
 		r.xvfbWindow.Capture(r.ctx, x11capPath, time.Duration(r.req.Timeout/1000)*time.Second)
 	}
 
-	time.Sleep(time.Duration(r.req.Timeout) * time.Millisecond)
-
-	err = project.Log(r.ctx, false)
+	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Printf("failed to get log: %v", err)
+		log.Printf("failed to create watcher: %+v", err)
+	}
+
+	if err := watcher.Add(r.submitPath); err != nil {
+		log.Printf("failed to watch: %+v")
 		return false, err
+	}
+
+	timer := time.NewTicker(time.Duration(r.req.Timeout) * time.Microsecond)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+	case _, _ = <-watcher.Events: // flag written
 	}
 
 	ok, err := r.checkFlag()

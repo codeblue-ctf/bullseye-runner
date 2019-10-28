@@ -15,6 +15,7 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/libcompose v0.4.1-0.20190808084053-143e0f3f1ab9
+	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/go-playground/validator v9.30.0+incompatible
@@ -54,7 +55,7 @@ require (
 	golang.org/x/mobile v0.0.0-20190910184405-b558ed863381 // indirect
 	golang.org/x/net v0.0.0-20190926025831-c00fd9afed17 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
-	golang.org/x/sys v0.0.0-20190926180325-855e68c8590b // indirect
+	golang.org/x/sys v0.0.0-20191028164358-195ce5e7f934 // indirect
 	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0 // indirect
 	golang.org/x/tools v0.0.0-20190926165942-a8d5d34286bd // indirect
 	google.golang.org/api v0.10.0 // indirect
