@@ -289,7 +289,7 @@ func (r *Runner) Run() (bool, error) {
 		return false, err
 	}
 
-	timer := time.NewTimer(time.Duration(r.req.Timeout) * time.Microsecond)
+	timer := time.NewTimer(time.Duration(r.req.Timeout) * time.Millisecond)
 	defer timer.Stop()
 
 	func() {
@@ -302,6 +302,7 @@ func (r *Runner) Run() (bool, error) {
 					log.Printf("watcher.Events not ok")
 				}
 				if event.Op&fsnotify.Write == fsnotify.Write {
+					log.Printf("flag submitted")
 					return
 				}
 				log.Printf("event: %+v", event)
