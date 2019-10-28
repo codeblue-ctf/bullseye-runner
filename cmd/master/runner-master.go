@@ -52,7 +52,9 @@ func main() {
 	master.InitLogger(*debug)
 	initDB(db)
 
+	master.InitScheduler()
 	go master.RunScheduler(db)
+	go master.RunUpdater(db)
 
 	e := echo.New()
 	e.Use(middleware.Logger())

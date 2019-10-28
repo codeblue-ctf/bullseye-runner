@@ -56,7 +56,7 @@ func sendCallback(url string, results []Result) error {
 }
 
 // updateResult
-func updateResult(db *gorm.DB) {
+func updateResult(db *gorm.DB) error {
 	resultMap := make(map[uint][]JobQ)
 	callbackMap := make(map[string][]Result)
 
@@ -70,7 +70,11 @@ func updateResult(db *gorm.DB) {
 
 	for resultID, jqs := range resultMap {
 		result := Result{}
-		db.Find(&result, "id = ?", resultID)
+		hit := 0
+		db.Find(&result, "id = ?", resultID).Count(&hit)
+		if hit == 0 {
+			return fmt.Errorf("result not found: %d", resultID)
+		}
 		jobs := []Job{}
 		for _, jq := range jqs {
 			if jq.job.Succeeded {
@@ -85,9 +89,21 @@ func updateResult(db *gorm.DB) {
 			close(jq.done)
 		}
 
-		// send callback
 		round := Round{}
-		db.Find(&round, "id = ?", result.RoundID)
+		db.Find(&round, "id = ?", result.RoundID).Count(&hit)
+		if hit == 0 {
+			return fmt.Errorf("round not found: %d", result.RoundID)
+		}
+
+		// delete context if finished
+		if result.Executed == round.Ntrials {
+			err := CancelMgr.Cancel(fmt.Sprintf("%d", round.ID))
+			if err != nil {
+				logger.Debug("failed to cancel", zap.Error(err))
+			}
+		}
+
+		// send callback
 		url := round.CallbackURL
 		if url != "" {
 			callbackMap[url] = append(callbackMap[url], result)
@@ -102,16 +118,20 @@ func updateResult(db *gorm.DB) {
 			}
 		}
 	}()
+
+	return nil
 }
 
-func RunScheduler(db *gorm.DB) {
+func InitScheduler() {
 	// initialize
 	MasterCtx = context.Background()
 	CancelMgr = NewCancelManager()
 	connPool = NewConnPool()
 	jqCh = make(chan JobQ, 100000)
 	rand.Seed(time.Now().UnixNano())
+}
 
+func RunScheduler(db *gorm.DB) {
 	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
 
@@ -122,7 +142,21 @@ func RunScheduler(db *gorm.DB) {
 			if err != nil {
 				logger.Warn("scheduling error", zap.Error(err))
 			}
-			updateResult(db)
+		}
+	}
+}
+
+func RunUpdater(db *gorm.DB) {
+	ticker := time.NewTicker(time.Second * 5)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			err := updateResult(db)
+			if err != nil {
+				logger.Warn("update error", zap.Error(err))
+			}
 		}
 	}
 }
@@ -133,39 +167,47 @@ func doSchedule(db *gorm.DB) error {
 	logger.Debug("checking rounds")
 
 	// find past unexecuted round or manually added ones
-	db.Preload("Results").Where("start_at <= ?", time.Now()).Or("start_at = NULL").Find(&rounds)
+	db.Where("start_at <= ?", time.Now()).Or("start_at = NULL").Find(&rounds)
 
 	for _, round := range rounds {
 		// skip if already executed
-		if len(round.Results) > 0 {
+		if round.Checked {
 			continue
 		}
 
 		digest, err := func() (string, error) {
 			// return specified hash if exists
 			if round.ImageHash != "" {
+				logger.Debug("image hash already exists", zap.String("ImageHash", round.ImageHash))
 				return round.ImageHash, nil
 			}
 			// get latest hash
 			image, err := findImage(db, round)
 			if err != nil {
-				logger.Debug("couldn't find appropriate image")
+				logger.Debug("couldn't find appropriate image", zap.String("round", fmt.Sprintf("%+v", round)))
 				return "", err
 			}
 			logger.Debug("found image", zap.String("image", fmt.Sprintf("%+v", image)))
+			// save image hash
 			round.ImageHash = image.Digest
 			db.Save(&round)
 			return image.Digest, nil
 		}()
 		if err != nil {
+			// team hasn't pushed exploit
+			round.Checked = true
+			db.Save(&round)
 			continue
 		}
 
-		go func() {
+		go func(round Round) {
 			if err := doRound(db, round, digest); err != nil {
 				logger.Warn("doRound", zap.Error(err))
 			}
-		}()
+			// round checked
+			round.Checked = true
+			db.Save(&round)
+		}(round)
 	}
 
 	return nil
@@ -233,7 +275,11 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 
 			_, err = SendRequest(grpcCli, req, ctx)
 			if err != nil {
+				// failed to pull
 				logger.Warn("PullRequest", zap.Error(err))
+				round.ImageHash = ""
+				logger.Debug("reset image hash")
+				db.Save(&round)
 				return err
 			}
 
@@ -250,6 +296,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 	}()
 	if err != nil {
 		logger.Warn("failed to pull image", zap.Error(err))
+		CancelMgr.Cancel(fmt.Sprintf("%d", round.ID))
 		return err
 	}
 
@@ -306,10 +353,18 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 				return
 			}
 
-			res, err := SendRequest(grpcCli, req, _ctx)
-			if err != nil {
-				logger.Warn("SendRequest", zap.Error(err))
-				return
+			var res *pb.RunnerResponse
+
+			for {
+				res, err = SendRequest(grpcCli, req, _ctx)
+				if err != nil {
+					logger.Warn("SendRequest", zap.Error(err))
+					// resend after waiting 5 seconds
+					logger.Warn("resend after waiting 5 seconds")
+					time.Sleep(5 * time.Second)
+					continue
+				}
+				break
 			}
 
 			job := &Job{
@@ -343,7 +398,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 func SendRequest(grpcCli *grpc.ClientConn, req *pb.RunnerRequest, ctx context.Context) (*pb.RunnerResponse, error) {
 	res, err := pb.NewRunnerClient(grpcCli).Run(ctx, req)
 	if err != nil {
-		logger.Warn("grpc error", zap.Error(err))
+		logger.Warn("grpc error", zap.String("host", grpcCli.Target()), zap.String("uuid", res.Uuid), zap.Error(err))
 		return nil, err
 	}
 	logger.Debug("response", zap.String("host", grpcCli.Target()), zap.String("uuid", res.Uuid), zap.Bool("succeeded", res.Succeeded))

@@ -2,6 +2,7 @@ package master
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -43,7 +44,8 @@ type Round struct {
 	ExploitContainer string     `json:"exploit_container"`
 	Team             string     `json:"team"`
 	ScheduleID       uint       `json:"schedule_id"`
-	ImageHash        string     `json:"image_hash,omitempty"`
+	ImageHash        string     `json:"image_hash"`
+	Checked          bool       `json:"checked"`
 	Results          []Result   `json:"-"`
 }
 
@@ -73,6 +75,8 @@ type Image struct {
 	RemoteAddr       string `json:"remote_addr"`
 	UserAgent        string `json:"user_agent"`
 }
+
+var smut sync.Mutex
 
 func (s *Schedule) AfterCreate(db *gorm.DB) error {
 	// create rounds according to schedule
