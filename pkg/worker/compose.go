@@ -289,7 +289,7 @@ func (r *Runner) Run() (bool, error) {
 		return false, err
 	}
 
-	timer := time.NewTicker(time.Duration(r.req.Timeout) * time.Microsecond)
+	timer := time.NewTimer(time.Duration(r.req.Timeout) * time.Microsecond)
 	defer timer.Stop()
 
 	func() {
