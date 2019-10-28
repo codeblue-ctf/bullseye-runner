@@ -2,22 +2,19 @@ version: '2'
 
 services:
   exploit:
-    image: localhost:5000/team01/test-exploit
+    image: localhost:5000/team01/test-challenge
     depends_on:
       - challenge
       - flag-submit
-    # links:
-    #   - challenge
-    #   - flag-submit
   challenge:
     image: localhost:5000/test-challenge
     volumes:
-      - "/tmp/hoge-flag:/flag"
+      - "./flag:/flag"
     expose:
       - "8080"
   flag-submit:
     image: localhost:5000/flag-submit
     volumes:
-      - "/tmp/hoge-submit:/flag"
+      - "./submitflag:/flag"
     expose:
       - "1337"
