@@ -292,10 +292,27 @@ func (r *Runner) Run() (bool, error) {
 	timer := time.NewTicker(time.Duration(r.req.Timeout) * time.Microsecond)
 	defer timer.Stop()
 
-	select {
-	case <-timer.C:
-	case _, _ = <-watcher.Events: // flag written
-	}
+	func() {
+		for {
+			select {
+			case <-timer.C:
+				return
+			case event, ok := <-watcher.Events: // flag written
+				if !ok {
+					log.Printf("watcher.Events not ok")
+				}
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					return
+				}
+				log.Printf("event: %+v", event)
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					log.Printf("watcher.Errors not ok")
+				}
+				log.Printf("err: %+v", err)
+			}
+		}
+	}()
 
 	ok, err := r.checkFlag()
 	if err != nil {
