@@ -104,7 +104,7 @@ func (s *Schedule) AfterCreate(db *gorm.DB) error {
 	return nil
 }
 
-func (s *Schedule) BeforeDelete(db *gorm.DB) error {
+func (s *Schedule) AfterDelete(db *gorm.DB) error {
 	// cleanup unexecuted rounds
 	rounds := []Round{}
 	db.Model(s).Association("Rounds").Find(&rounds)
@@ -112,11 +112,12 @@ func (s *Schedule) BeforeDelete(db *gorm.DB) error {
 	return nil
 }
 
-func (r *Result) BeforeDelete(db *gorm.DB) error {
+func (r *Result) AfterDelete(db *gorm.DB) error {
 	CancelMgr.Cancel(fmt.Sprintf("%d", r.ID))
 	jobs := []Job{}
 	db.Model(r).Association("Jobs").Find(&jobs)
 	db.Delete(&jobs)
+	CancelMgr.Cancel(fmt.Sprintf("%d", r.RoundID))
 	return nil
 }
 

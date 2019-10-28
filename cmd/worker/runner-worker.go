@@ -26,7 +26,7 @@ var (
 
 func initJobQueue() {
 	cpus := runtime.NumCPU()
-	worker.JobQueue = make(chan struct{}, cpus*2)
+	worker.JobQueue = make(chan struct{}, cpus)
 }
 
 func checkXvfb() {

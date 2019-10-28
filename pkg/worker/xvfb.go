@@ -122,7 +122,7 @@ func (x *XvfbWindow) CreateXvfb() error {
 
 // Capture will execute FFmpeg in background.
 func (x *XvfbWindow) Capture(ctx context.Context, outfile string, duration time.Duration) error {
-	cmd := exec.CommandContext(ctx, FFmpegPath, "-f", "x11grab", "-video_size", fmt.Sprintf("%dx%d", x.width, x.height), "-framerate", "25", "-i", fmt.Sprintf(":%d", x.display), "-t", fmt.Sprintf("%f", duration.Seconds()), outfile)
+	cmd := exec.CommandContext(ctx, FFmpegPath, "-f", "x11grab", "-i", fmt.Sprintf(":%d", x.display), "-video_size", fmt.Sprintf("%dx%d", x.width, x.height), "-t", fmt.Sprintf("%f", duration.Seconds()), "-vcodec", "libx264", outfile)
 	err := cmd.Start()
 	if err != nil {
 		return err

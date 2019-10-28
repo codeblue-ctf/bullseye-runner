@@ -56,7 +56,7 @@ func sendCallback(url string, results []Result) error {
 }
 
 // updateResult
-func updateResult(db *gorm.DB) error {
+func updateResult(db *gorm.DB) {
 	resultMap := make(map[uint][]JobQ)
 	callbackMap := make(map[string][]Result)
 
@@ -73,7 +73,8 @@ func updateResult(db *gorm.DB) error {
 		hit := 0
 		db.Find(&result, "id = ?", resultID).Count(&hit)
 		if hit == 0 {
-			return fmt.Errorf("result not found: %d", resultID)
+			logger.Warn("result not found", zap.Uint("resultID", resultID))
+			continue
 		}
 		jobs := []Job{}
 		for _, jq := range jqs {
@@ -92,7 +93,8 @@ func updateResult(db *gorm.DB) error {
 		round := Round{}
 		db.Find(&round, "id = ?", result.RoundID).Count(&hit)
 		if hit == 0 {
-			return fmt.Errorf("round not found: %d", result.RoundID)
+			logger.Warn("round not found", zap.Uint("roundID", result.RoundID))
+			continue
 		}
 
 		// delete context if finished
@@ -118,8 +120,6 @@ func updateResult(db *gorm.DB) error {
 			}
 		}
 	}()
-
-	return nil
 }
 
 func InitScheduler() {
@@ -153,10 +153,7 @@ func RunUpdater(db *gorm.DB) {
 	for {
 		select {
 		case <-ticker.C:
-			err := updateResult(db)
-			if err != nil {
-				logger.Warn("update error", zap.Error(err))
-			}
+			updateResult(db)
 		}
 	}
 }
@@ -175,6 +172,7 @@ func doSchedule(db *gorm.DB) error {
 			continue
 		}
 
+		// search ImageHash
 		digest, err := func() (string, error) {
 			// return specified hash if exists
 			if round.ImageHash != "" {
@@ -200,14 +198,19 @@ func doSchedule(db *gorm.DB) error {
 			continue
 		}
 
+		// round checked
+		round.Checked = true
+		db.Save(&round)
+
 		go func(round Round) {
 			if err := doRound(db, round, digest); err != nil {
+				round.Checked = false
+				db.Save(&round)
 				logger.Warn("doRound", zap.Error(err))
 			}
-			// round checked
-			round.Checked = true
-			db.Save(&round)
 		}(round)
+
+		time.Sleep(10 * time.Microsecond)
 	}
 
 	return nil
@@ -277,8 +280,8 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 			if err != nil {
 				// failed to pull
 				logger.Warn("PullRequest", zap.Error(err))
-				round.ImageHash = ""
 				logger.Debug("reset image hash")
+				round.ImageHash = ""
 				db.Save(&round)
 				return err
 			}
@@ -338,7 +341,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 				Width:  1024,
 				Height: 768,
 				Depth:  24,
-				CapExt: "mp4",
+				CapExt: "",
 			}
 		}
 
@@ -375,7 +378,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 				ResultID:  result.ID,
 			}
 
-			if round.X11required {
+			if round.X11required && len(res.X11Cap) > 0 {
 				err := ioutil.WriteFile(fmt.Sprintf("%s/%s.%s", X11CapPrefix, req.Uuid, req.X11Info.CapExt), res.X11Cap, 0644)
 				if err != nil {
 					logger.Warn("failed to save X11 capture", zap.Error(err))
@@ -398,7 +401,7 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 func SendRequest(grpcCli *grpc.ClientConn, req *pb.RunnerRequest, ctx context.Context) (*pb.RunnerResponse, error) {
 	res, err := pb.NewRunnerClient(grpcCli).Run(ctx, req)
 	if err != nil {
-		logger.Warn("grpc error", zap.String("host", grpcCli.Target()), zap.String("uuid", res.Uuid), zap.Error(err))
+		logger.Warn("grpc error", zap.String("host", grpcCli.Target()), zap.Error(err))
 		return nil, err
 	}
 	logger.Debug("response", zap.String("host", grpcCli.Target()), zap.String("uuid", res.Uuid), zap.Bool("succeeded", res.Succeeded))

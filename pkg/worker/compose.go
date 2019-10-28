@@ -172,6 +172,12 @@ func (r *Runner) cleanCompose() {
 		err := r.xvfbWindow.FFmpegCmd.Wait()
 		if err != nil {
 			log.Printf("failed to wait ffmpeg: %+v", err)
+			output, err := r.xvfbWindow.FFmpegCmd.CombinedOutput()
+			if err != nil {
+				log.Printf("failed to get combined output: %+v", err)
+			} else {
+				log.Printf("ffmpeg output: %+v", output)
+			}
 		}
 		// if err := r.xvfbWindow.FFmpegCmd.Process.Kill(); err != nil {
 		// 	log.Printf("failed to kill ffmpeg: %+v", err)
@@ -181,6 +187,10 @@ func (r *Runner) cleanCompose() {
 	r.project.Delete(context.Background(), options.Delete{
 		RemoveVolume:  true,
 		RemoveRunning: true,
+	})
+	r.project.Down(context.Background(), options.Down{
+		RemoveVolume:  true,
+		RemoveOrphans: true,
 	})
 	r.cleanNetwork()
 }
@@ -255,18 +265,18 @@ func (r *Runner) Run() (bool, error) {
 	}
 	defer r.cleanNetwork()
 
-	if r.x11capturing {
-		x11capPath := fmt.Sprintf("/tmp/%s.%s", r.uuid, r.req.X11Info.CapExt)
-		r.x11capPath = x11capPath
-		r.xvfbWindow.Capture(r.ctx, x11capPath, time.Duration(r.req.Timeout/1000)*time.Second)
-	}
-
 	err = project.Up(r.ctx, options.Up{})
 	if err != nil {
 		log.Printf("failed to up: %v", err)
 		return false, err
 	}
 	defer r.cleanCompose()
+
+	if r.x11capturing {
+		x11capPath := fmt.Sprintf("/tmp/%s.%s", r.uuid, r.req.X11Info.CapExt)
+		r.x11capPath = x11capPath
+		r.xvfbWindow.Capture(r.ctx, x11capPath, time.Duration(r.req.Timeout/1000)*time.Second)
+	}
 
 	time.Sleep(time.Duration(r.req.Timeout) * time.Millisecond)
 
