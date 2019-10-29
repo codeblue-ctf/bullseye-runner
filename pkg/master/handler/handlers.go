@@ -94,6 +94,20 @@ func PostRound(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
+func DeleteRound(db *gorm.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		id := c.Param("id")
+		round := master.Round{}
+		hit := 0
+		db.Preload("Results").Find(&round, "id = ?", id).Count(&hit)
+		if hit == 0 {
+			return c.JSON(http.StatusNotFound, "round not found")
+		}
+		db.Delete(&round)
+		return c.JSON(http.StatusOK, round)
+	}
+}
+
 func GetResult(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.Param("id")

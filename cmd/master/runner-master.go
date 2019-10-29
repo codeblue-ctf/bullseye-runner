@@ -71,6 +71,7 @@ func main() {
 	e.POST("/round", handler.PostRound(db))
 	e.GET("/round/:id", handler.GetRound(db))
 	e.GET("/round/capture/:id", handler.GetSampleCaptureByRoundID(db))
+	e.DELETE("/round/:id", handler.DeleteRound(db))
 
 	e.GET("/result", handler.GetResult(db))
 	e.GET("/result/:id", handler.GetResult(db))

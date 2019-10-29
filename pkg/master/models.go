@@ -112,8 +112,20 @@ func (s *Schedule) AfterDelete(db *gorm.DB) error {
 	return nil
 }
 
-func (r *Result) AfterDelete(db *gorm.DB) error {
+func (r *Round) AfterDelete(db *gorm.DB) error {
 	CancelMgr.Cancel(fmt.Sprintf("%d", r.ID))
+	results := []Result{}
+	db.Model(r).Related(&results)
+	for _, result := range results {
+		if result.ID == 0 {
+			continue
+		}
+		db.Delete(&result)
+	}
+	return nil
+}
+
+func (r *Result) AfterDelete(db *gorm.DB) error {
 	jobs := []Job{}
 	db.Model(r).Association("Jobs").Find(&jobs)
 	db.Delete(&jobs)
