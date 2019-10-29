@@ -106,9 +106,9 @@ func (s *Schedule) AfterCreate(db *gorm.DB) error {
 
 func (s *Schedule) AfterDelete(db *gorm.DB) error {
 	// cleanup unexecuted rounds
-	rounds := []Round{}
-	db.Model(s).Association("Rounds").Find(&rounds)
-	db.Delete(&rounds)
+	// rounds := []Round{}
+	// db.Model(s).Association("Rounds").Find(&rounds)
+	// db.Delete(&rounds)
 	return nil
 }
 
