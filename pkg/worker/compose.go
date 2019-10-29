@@ -21,7 +21,6 @@ import (
 	dockerctx "github.com/docker/libcompose/docker/ctx"
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/project/options"
-	"github.com/fsnotify/fsnotify"
 	"github.com/lucasjones/reggen"
 
 	pb "gitlab.com/CBCTF/bullseye-runner/proto"
@@ -204,6 +203,8 @@ func (r *Runner) cleanCompose() {
 }
 
 func (r *Runner) Run() (bool, error) {
+	log.Printf("running job")
+
 	if err := r.prepareFlags(); err != nil {
 		return false, err
 	}
@@ -268,17 +269,23 @@ func (r *Runner) Run() (bool, error) {
 	r.project = project
 
 	// create network in advance to make evaluation faster
+	defer r.cleanNetwork()
 	if err := r.prepareNetwork(); err != nil {
 		return false, err
 	}
-	defer r.cleanNetwork()
 
+	submitFile, err := os.Stat(r.submitPath)
+	if err != nil {
+		return false, err
+	}
+	submitMod := submitFile.ModTime()
+
+	defer r.cleanCompose()
 	err = project.Up(r.ctx, options.Up{})
 	if err != nil {
 		log.Printf("failed to up: %v", err)
 		return false, err
 	}
-	defer r.cleanCompose()
 
 	if r.x11capturing {
 		x11capPath := fmt.Sprintf("/tmp/%s.%s", r.uuid, r.req.X11Info.CapExt)
@@ -286,38 +293,26 @@ func (r *Runner) Run() (bool, error) {
 		r.xvfbWindow.Capture(r.ctx, x11capPath, time.Duration(r.req.Timeout/1000)*time.Second)
 	}
 
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		log.Printf("failed to create watcher: %+v", err)
-	}
-
-	if err := watcher.Add(r.submitPath); err != nil {
-		log.Printf("failed to watch: %+v")
-		return false, err
-	}
-
 	timer := time.NewTimer(time.Duration(r.req.Timeout) * time.Millisecond)
 	defer timer.Stop()
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 
 	func() {
 		for {
 			select {
 			case <-timer.C:
 				return
-			case event, ok := <-watcher.Events: // flag written
-				if !ok {
-					log.Printf("watcher.Events not ok")
+			case <-ticker.C:
+				curFile, err := os.Stat(r.submitPath)
+				if err != nil {
+					log.Printf("failed to stat submitPath: %+v", err)
+					continue
 				}
-				if event.Op&fsnotify.Write == fsnotify.Write {
-					log.Printf("flag submitted")
+				if submitMod != curFile.ModTime() {
 					return
 				}
-				log.Printf("event: %+v", event)
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					log.Printf("watcher.Errors not ok")
-				}
-				log.Printf("err: %+v", err)
 			}
 		}
 	}()
