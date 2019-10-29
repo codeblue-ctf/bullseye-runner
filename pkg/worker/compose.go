@@ -14,6 +14,7 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	clitypes "github.com/docker/cli/cli/config/types"
 	apitypes "github.com/docker/docker/api/types"
+	filters "github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/libcompose/docker"
 	"github.com/docker/libcompose/docker/auth"
@@ -162,6 +163,12 @@ func (r *Runner) cleanNetwork() error {
 		return err
 	}
 	if err := client.NetworkRemove(context.Background(), networkID); err != nil {
+		return err
+	}
+
+	_, err = client.NetworksPrune(context.Background(), filters.NewArgs())
+	if err != nil {
+		log.Printf("failed to prune networks: %+v", err)
 		return err
 	}
 
