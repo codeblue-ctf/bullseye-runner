@@ -84,6 +84,9 @@ func updateResult(db *gorm.DB) {
 			result.Executed++
 			jobs = append(jobs, *jq.job)
 		}
+		if result.RoundID == 0 { // cancelled
+			continue
+		}
 		db.Save(&result)
 		db.Model(&result).Association("Jobs").Append(jobs)
 		for _, jq := range jqs {
@@ -244,8 +247,8 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 
 	logger.Info("scheduling round", zap.Int("roundID", int(round.ID)))
 
-	result := Result{}
-	db.Model(&round).Association("Results").Append(&result)
+	result := Result{RoundID: round.ID}
+	db.Save(&result)
 
 	ctx, err := CancelMgr.Add(fmt.Sprintf("%d", round.ID), MasterCtx)
 	if err != nil {
@@ -361,6 +364,10 @@ func doRound(db *gorm.DB, round Round, digest string) error {
 			for {
 				res, err = SendRequest(grpcCli, req, _ctx)
 				if err != nil {
+					if strings.Contains(fmt.Sprintf("%+v", err), "context canceled") {
+						logger.Info("context canceled, aborting worker")
+						return
+					}
 					logger.Warn("SendRequest", zap.Error(err))
 					// resend after waiting 5 seconds
 					logger.Warn("resend after waiting 5 seconds")

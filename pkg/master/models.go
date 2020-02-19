@@ -18,7 +18,7 @@ type Schedule struct {
 	Interval         uint      `json:"interval"`
 	Ntrials          uint      `json:"ntrials"`
 	Timeout          uint      `json:"timeout"`
-	WorkerHosts      string    `json:"worker_hosts"`
+	WorkerHosts      string    `json:"worker_hosts" sql:"type:text;"`
 	RegistryHost     string    `json:"registry_host"`
 	RegistryUsername string    `json:"registry_username"`
 	RegistryPassword string    `json:"registry_password"`
@@ -112,7 +112,7 @@ func (s *Schedule) AfterDelete(db *gorm.DB) error {
 	return nil
 }
 
-func (r *Round) AfterDelete(db *gorm.DB) error {
+func (r *Round) BeforeDelete(db *gorm.DB) error {
 	CancelMgr.Cancel(fmt.Sprintf("%d", r.ID))
 	results := []Result{}
 	db.Model(r).Related(&results)
@@ -125,10 +125,15 @@ func (r *Round) AfterDelete(db *gorm.DB) error {
 	return nil
 }
 
-func (r *Result) AfterDelete(db *gorm.DB) error {
+func (r *Result) BeforeDelete(db *gorm.DB) error {
 	jobs := []Job{}
-	db.Model(r).Association("Jobs").Find(&jobs)
-	db.Delete(&jobs)
+	db.Model(r).Related(&jobs)
+	for _, job := range jobs {
+		if job.ID == 0 {
+			continue
+		}
+		db.Delete(&job)
+	}
 	CancelMgr.Cancel(fmt.Sprintf("%d", r.RoundID))
 	return nil
 }
