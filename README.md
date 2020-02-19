@@ -23,8 +23,3 @@ New Bull's Eye Runner implemented in Golang
     - worker binary listening gRPC connection from runner-master
   - `client`
     - test client for runner-worker
-
-## TODO
-- scheduler in runner-master
-- forwarding X11 display to show audience what's going on
-- send evaluation result in real-time to bullseye-web
