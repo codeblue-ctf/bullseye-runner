@@ -1,0 +1,13 @@
+[Unit]
+Description=Bull's Eye Registry Notification
+After=network.target
+
+[Service]
+Type=simple
+User=vagrant
+ExecStart=/home/vagrant/notification
+Restart=always
+WorkingDirectory=/home/vagrant/
+
+[Install]
+WantedBy=multi-user.target

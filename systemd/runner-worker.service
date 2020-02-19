@@ -1,0 +1,14 @@
+[Unit]
+Description=Bull's Eye Runner worker
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+User=vagrant
+ExecStart=/home/vagrant/runner-worker
+Restart=always
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

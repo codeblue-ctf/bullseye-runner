@@ -1,0 +1,13 @@
+[Unit]
+Description=Bull's Eye Runner master
+After=network.target
+
+[Service]
+Type=simple
+User=vagrant
+ExecStart=/home/vagrant/runner-master
+Restart=always
+WorkingDirectory=/home/vagrant/
+
+[Install]
+WantedBy=multi-user.target
